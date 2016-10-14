@@ -24,14 +24,16 @@ from ._vendor.auxlib.logz import stringify
 from .base.constants import CONDA_HOMEPAGE_URL
 from .base.context import context
 from .common.disk import exp_backoff_fn, rm_rf
-from .common.url import join_url, maybe_add_auth, url_to_path
-from .compat import iteritems, itervalues
+from .common.url import add_username_and_pass_to_url, url_to_path, urlparse
+from .compat import input, iteritems, itervalues
 from .connection import CondaSession, RETRIES
 from .exceptions import CondaHTTPError, CondaRuntimeError, CondaSignatureError, MD5MismatchError
 from .install import add_cached_package, dist2pair, find_new_location, package_cache
 from .lock import FileLock
 from .models.channel import Channel, offline_keep
 from .models.record import Record
+
+import tuf.client.updater
 
 log = getLogger(__name__)
 dotlog = getLogger('dotupdate')
@@ -347,28 +349,44 @@ def fetch_index(channel_urls, use_cache=False, unknown=False, index=None):
 
 
 def fetch_pkg(info, dst_dir=None, session=None):
-    '''
+    """
     fetch a package given by `info` and store it into `dst_dir`
-    '''
-
-    session = session or CondaSession()
-
+    """
     fn = info['fn']
     url = info.get('url') or info['channel'] + '/' + fn
     url = maybe_add_auth(url, info.get('auth'))
     log.debug("url=%r" % url)
 
+    channel = urlparse(info['channel'])
+    channel_prefix = "%s://%s" % (channel.scheme, channel.host)
+    if channel.port:
+        channel_prefix = "%s:%s" % (channel_prefix, channel.port)
+    metadata_path = "%s/%s" % ("/".join(channel.path.split("/")[:-1]), "metadata")
+    targets_path = channel.path
+
+    # import pdb; pdb.set_trace()
+
+    tuf.conf.repository_directory = context.local_repository
+    repository_mirror = {'mirror1': {'url_prefix': channel_prefix,
+                                     'metadata_path': metadata_path,
+                                     'targets_path': targets_path,
+                                     'confined_target_dirs': [""]}}
+
     if dst_dir is None:
         dst_dir = find_new_location(fn[:-8])[0]
+
+    updater = tuf.client.updater.Updater('updater', repository_mirror)
+    updater.refresh()
+    target = updater.target(urlparse(url).path.lstrip("/"))
+    updated_target = updater.updated_target([target], dst_dir)
+
     path = join(dst_dir, fn)
-
     download(url, path, session=session, md5=info['md5'], urlstxt=True)
-    if info.get('sig'):
+    sig = info.get('sig')
+    if sig:
         from .signature import verify
-
         fn2 = fn + '.sig'
-        url = (info['channel'] if info['sig'] == '.' else
-               info['sig'].rstrip('/')) + '/' + fn2
+        url = (info['channel'] if sig == '.' else sig.rstrip('/')) + '/' + fn2
         log.debug("signature url=%r" % url)
         download(url, join(dst_dir, fn2), session=session)
         try:
@@ -376,7 +394,6 @@ def fetch_pkg(info, dst_dir=None, session=None):
                 return
         except CondaSignatureError:
             raise
-
         raise CondaSignatureError("Error: Signature for '%s' is invalid." % (basename(path)))
 
 

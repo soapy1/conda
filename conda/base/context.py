@@ -278,6 +278,10 @@ class Context(Configuration):
         all_channels = (ch for ch in concat(all_sources))
         return odict((x.name, x) for x in all_channels)
 
+    @property
+    def local_repository(self):
+        return "%s/pkgs" % get_prefix(self, self._argparse_args, False)
+
 
 def conda_in_private_env():
     # conda is located in its own private environment named '_conda'
