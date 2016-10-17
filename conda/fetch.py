@@ -24,7 +24,7 @@ from ._vendor.auxlib.logz import stringify
 from .base.constants import CONDA_HOMEPAGE_URL
 from .base.context import context
 from .common.disk import exp_backoff_fn, rm_rf
-from .common.url import add_username_and_pass_to_url, url_to_path, urlparse
+from .common.url import add_username_and_password, maybe_add_auth, url_to_path, urlparse, join_url
 from .compat import input, iteritems, itervalues
 from .connection import CondaSession, RETRIES
 from .exceptions import CondaHTTPError, CondaRuntimeError, CondaSignatureError, MD5MismatchError
@@ -361,7 +361,7 @@ def fetch_pkg(info, dst_dir=None, session=None):
     channel_prefix = "%s://%s" % (channel.scheme, channel.host)
     if channel.port:
         channel_prefix = "%s:%s" % (channel_prefix, channel.port)
-    metadata_path = "%s/%s" % ("/".join(channel.path.split("/")[:-1]), "metadata")
+    metadata_path = "metadata"
     targets_path = channel.path
 
     # import pdb; pdb.set_trace()
@@ -369,19 +369,21 @@ def fetch_pkg(info, dst_dir=None, session=None):
     tuf.conf.repository_directory = context.local_repository
     repository_mirror = {'mirror1': {'url_prefix': channel_prefix,
                                      'metadata_path': metadata_path,
-                                     'targets_path': targets_path,
+                                     'targets_path': targets_path.rstrip("/"),
                                      'confined_target_dirs': [""]}}
 
     if dst_dir is None:
         dst_dir = find_new_location(fn[:-8])[0]
 
-    updater = tuf.client.updater.Updater('updater', repository_mirror)
+    updater = tuf.client.updater.Updater('repo-signed', repository_mirror)
     updater.refresh()
-    target = updater.target(urlparse(url).path.lstrip("/"))
-    updated_target = updater.updated_target([target], dst_dir)
+    target_repo = updater.targets_of_role("targets/repo-signed")
+    # At this point, there should only ever be one update target
+    updated_target = updater.updated_targets(target_repo, dst_dir)[0]
 
     path = join(dst_dir, fn)
-    download(url, path, session=session, md5=info['md5'], urlstxt=True)
+    download(url, path, session=session, md5=info['md5'], urlstxt=True,
+             target=updated_target, updater=updater)
     sig = info.get('sig')
     if sig:
         from .signature import verify
@@ -397,7 +399,8 @@ def fetch_pkg(info, dst_dir=None, session=None):
         raise CondaSignatureError("Error: Signature for '%s' is invalid." % (basename(path)))
 
 
-def download(url, dst_path, session=None, md5=None, urlstxt=False, retries=None):
+def download(url, dst_path, session=None, md5=None, urlstxt=False, retries=None,
+             target=None, updater=None):
     assert "::" not in str(dst_path), str(dst_path)
     if not offline_keep(url):
         raise RuntimeError("Cannot download in offline mode: %s" % (url,))
@@ -420,6 +423,8 @@ def download(url, dst_path, session=None, md5=None, urlstxt=False, retries=None)
     with FileLock(dst_path):
         rm_rf(dst_path)
         try:
+            if target is not None and updater is not None:
+                updater.download_target(target, dst_dir)
             resp = session.get(url, stream=True, proxies=session.proxies, timeout=(3.05, 27))
             resp.raise_for_status()
         except requests.exceptions.HTTPError as e:
