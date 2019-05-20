@@ -31,7 +31,7 @@ def disable_ssl_verify_warning():
 
 @time_recorder("download")
 def download(
-        url, target_full_path, md5=None, sha256=None, size=None, progress_update_callback=None
+        url, target_full_path, md5sum=None, sha256=None, size=None, progress_update_callback=None
 ):
     if exists(target_full_path):
         maybe_raise(BasicClobberError(target_full_path, url, context), context)
