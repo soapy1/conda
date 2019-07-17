@@ -43,6 +43,14 @@ def metapackage_37(cmd):
         print("failed")
 
 
+@st_time
+def run_conda_commands(cmd):
+    try:
+        subprocess.check_output(cmd)
+    except:
+        print("failed")
+
+
 if __name__ == '__main__':
     install_test_commands = [
         ['conda', 'install', 'flask', '-n', 'gofast', '-y'],
@@ -51,6 +59,7 @@ if __name__ == '__main__':
         ['conda', 'install', 'anaconda', '-n', 'gofast', '-y']
     ]
     for cmd in install_test_commands:
+        print(cmd)
         install_simple(cmd)
 
     metapackage_37_commands = [
@@ -58,5 +67,16 @@ if __name__ == '__main__':
         ['conda', 'update', '--all', '-n', 'metapackage-fast', '-y'],
         ['conda', 'update', 'ipython'],
     ]
-    for cmd in metapackage_37_commands:
-        metapackage_37(cmd)
+    # for cmd in metapackage_37_commands:
+    #     print(cmd)
+    #     metapackage_37(cmd)
+
+    conda_commands = [
+        ["conda", "create", "-n", "testenv", "scipy", "python=3.7", "-y"],
+        ["conda", "install", "-n", "testenv", "python=3.6", "-y"],
+        ["conda", "update", "-n", "testenv", "python", "-y"],
+        ["conda", "env", "remove", "-n", "testenv", "-y"]
+    ]
+    for cmd in conda_commands:
+        print(cmd)
+        run_conda_commands(cmd)
