@@ -80,3 +80,10 @@ if __name__ == '__main__':
     for cmd in conda_commands:
         print(cmd)
         run_conda_commands(cmd)
+
+    unsat_commands = [
+        ['conda', 'install', 'python=2', 'anaconda', 'rstudio', '-n', 'gofast', '-y']
+    ]
+    for cmd in unsat_commands:
+        print(cmd)
+        install_simple(cmd)
