@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+from .cli import common
 from .common.constants import NULL
 from .core.package_cache_data import PackageCacheData as _PackageCacheData
 from .core.prefix_data import PrefixData as _PrefixData
@@ -10,12 +11,48 @@ from .core.solve import DepsModifier as _DepsModifier, Solver as _Solver
 from .core.solve import UpdateModifier as _UpdateModifier
 from .core.subdir_data import SubdirData as _SubdirData
 from .models.channel import Channel
+from .exceptions import  PackagesNotFoundError, CondaSystemExit
+from .misc import touch_nonadmin
 
 DepsModifier = _DepsModifier
 """Flags to enable alternate handling of dependencies."""
 
 UpdateModifier = _UpdateModifier
 """Flags to enable alternate handling for updates of existing packages in the environment."""
+
+
+class TransactionHandler(object):
+    def __init__(self, transaction):
+        self.transaction = transaction
+
+    def execute(self, prefix, packages, newenv, remove_op=False, format_json=False):
+        if self.transaction.nothing_to_do:
+            if remove_op:
+                # No packages found to remove from environment
+                raise PackagesNotFoundError("Could not find packages: %s" % packages)
+            elif not newenv:
+                if format_json:
+                    common.stdout_json_success(message='All requested packages already installed.')
+                else:
+                    print('\n# All requested packages already installed.\n')
+                return
+
+        if not format_json:
+            self.transaction.print_transaction_summary()
+
+        try:
+            self.transaction.download_and_extract()
+            self.transaction.execute()
+        except SystemExit as e:
+            raise CondaSystemExit('Exiting', e)
+
+        if newenv:
+            touch_nonadmin(prefix)
+            print("Created environment %s " % prefix)
+
+        if format_json:
+            actions = self.transaction._make_legacy_action_groups()[0]
+            common.stdout_json_success(prefix=prefix, actions=actions)
 
 
 class Solver(object):
