@@ -15,6 +15,7 @@ import json
 from logging import DEBUG, getLogger
 from mmap import ACCESS_READ, mmap
 from os.path import dirname, isdir, join, splitext
+from os import rename
 import re
 from time import time
 import warnings
@@ -41,6 +42,8 @@ from ..gateways.disk.update import touch
 from ..models.channel import Channel, all_channel_urls
 from ..models.match_spec import MatchSpec
 from ..models.records import PackageRecord
+from ..common.authenticate import (sha512256, canonserialize, verify_signable,
+                                   verify_signature)
 
 try:
     import cPickle as pickle
@@ -255,20 +258,44 @@ class SubdirData(object):
                                                        mod_etag_headers.get('_mod'))
             return _internal_state
         else:
-            if not isdir(dirname(self.cache_path_json)):
-                mkdir_p(dirname(self.cache_path_json))
-            try:
-                with io_open(self.cache_path_json, 'w') as fh:
-                    fh.write(raw_repodata_str or '{}')
-            except (IOError, OSError) as e:
-                if e.errno in (EACCES, EPERM, EROFS):
-                    raise NotWritableError(self.cache_path_json, e.errno, caused_by=e)
-                else:
-                    raise
+            # TODO: validate repodata here
+            # steps:
+            #   1) save to temporary location
+            #   2) check signature against repodata_verify.json
+            #   3) save repodata if all good
+            unverified_repodata_path = canonserialize(
+                self.write_unverified_to_cache(raw_repodata_str))
+            if self.validate_repodata(unverified_repodata_path):
+                rename(unverified_repodata_path, self.cache_path_json)
+            else:
+                raise
+
             _internal_state = self._process_raw_repodata_str(raw_repodata_str)
             self._internal_state = _internal_state
             self._pickle_me()
             return _internal_state
+
+    def write_unverified_to_cache(self, raw_repodata_str):
+        cache_path_json_unverified = "%s.unverified" % self.cache_path_json
+        if not isdir(dirname(cache_path_json_unverified)):
+            mkdir_p(dirname(cache_path_json_unverified))
+        try:
+            with io_open(cache_path_json_unverified, 'w') as fh:
+                fh.write(raw_repodata_str or '{}')
+        except (IOError, OSError) as e:
+            if e.errno in (EACCES, EPERM, EROFS):
+                raise NotWritableError(cache_path_json_unverified, e.errno, caused_by=e)
+            else:
+                raise
+        return cache_path_json_unverified
+
+    def validate_repodata(self, unverified_repodata_path):
+        # import ipdb; ipdb.set_trace()
+        # TODO:
+        # hash unverified_repodata_path
+        # validate hash against repodata_verify.json
+
+        pass
 
     def _pickle_me(self):
         try:

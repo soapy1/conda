@@ -22,10 +22,6 @@ import cryptography.hazmat.primitives.serialization as serialization
 import cryptography.hazmat.primitives.hashes
 import cryptography.hazmat.backends
 
-# conda imports
-# TODO: ✅Use a relative import here to conform to conda's apparent practices.
-from conda_build.conda_interface import SignatureError
-
 
 # The only types we're allowed to wrap as "signables" and sign are
 # the JSON-serializable types.  (There are further constraints to what is
