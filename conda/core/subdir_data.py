@@ -263,8 +263,8 @@ class SubdirData(object):
                                                        mod_etag_headers.get('_mod'))
             return _internal_state
         else:
-            unverified_repodata_path = self.write_unverified_to_cache(raw_repodata_str)
-            if self.validate_repodata(raw_repodata_str):
+            unverified_repodata_path = self._write_unverified_to_cache(raw_repodata_str)
+            if self._validate_repodata(raw_repodata_str, mod_etag_headers):
                 rename(unverified_repodata_path, self.cache_path_json)
             else:
                 rm_rf(unverified_repodata_path)
@@ -274,26 +274,45 @@ class SubdirData(object):
             self._pickle_me()
             return _internal_state
 
-    def validate_repodata(self, raw_repodata_str):
+    def _validate_repodata(self, raw_repodata_str, mod_etag_headers):
+        repodata_verify = self._get_repodata_verify(mod_etag_headers)
+        # If there is no repodata_verify for the channel then that channel does not have
+        # verification. Don't try to validate
+        if repodata_verify is None:
+            return True
         repodata_hash = sha512256(canonserialize(raw_repodata_str))
         secured_file_key = "%s/%s" % (self.channel.subdir, self.repodata_fn)
-        self.fetch_or_check_repodata_verify()
-        with io_open(self.repodata_verify_fn, "r") as f:
-            repodata_verify = json.loads(f.read())
-        secured_files = repodata_verify.get("secured_files")
+        secured_files = repodata_verify.get("secured_files", {})
         if secured_files.get(secured_file_key, "") == repodata_hash:
             return True
         return False
 
-    def fetch_or_check_repodata_verify(self):
+    def _get_repodata_verify(self, mod_etag_headers):
         if lexists(self.repodata_verify_fn):
-            # Ensure it is up to date
-            pass
+            # TODO: check if repodata_verify needs to be refreshed
+            with io_open(self.repodata_verify_fn, "r") as f:
+                repodata_verify = json.loads(f.read())
         else:
-            # Download repodata verify for the channel
-            pass
+            try:
+                raw_repodata_verify_str = fetch_repodata_remote_request(
+                    self.url_w_credentials,
+                    mod_etag_headers.get('_etag'),
+                    mod_etag_headers.get('_mod'),
+                    repodata_fn="repodata_verify.json")
+            except UnavailableInvalidChannel:
+                raw_repodata_verify_str = None
+                log.debug("Could not find repodata_verify.json")
+            if raw_repodata_verify_str is None:
+                repodata_verify = None
+            else:
+                unverified_repodata_verify_path = self._write_unverified_to_cache(
+                    raw_repodata_verify_str)
+                # TODO: verify repodata_verify
+                rename(unverified_repodata_verify_path, self.repodata_verify_fn)
+                repodata_verify = json.loads(raw_repodata_verify_str)
+        return repodata_verify
 
-    def write_unverified_to_cache(self, raw_str):
+    def _write_unverified_to_cache(self, raw_str):
         cache_path_json_unverified = "%s.unverified" % self.cache_path_json
         if not isdir(dirname(cache_path_json_unverified)):
             mkdir_p(dirname(cache_path_json_unverified))
