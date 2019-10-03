@@ -32,7 +32,8 @@ from ..common.io import ThreadLimitedThreadPoolExecutor, DummyExecutor
 from ..common.url import join_url, maybe_unquote
 from ..core.package_cache_data import PackageCacheData
 from ..exceptions import (CondaDependencyError, CondaHTTPError, CondaUpgradeError,
-                          NotWritableError, UnavailableInvalidChannel, ProxyError)
+                          NotWritableError, UnavailableInvalidChannel, ProxyError,
+                          UntrustedRepodataError)
 from ..gateways.connection import (ConnectionError, HTTPError, InsecureRequestWarning,
                                    InvalidSchema, SSLError, RequestsProxyError)
 from ..gateways.connection.session import CondaSession
@@ -42,8 +43,7 @@ from ..gateways.disk.update import touch
 from ..models.channel import Channel, all_channel_urls
 from ..models.match_spec import MatchSpec
 from ..models.records import PackageRecord
-from ..common.authenticate import (sha512256, canonserialize, verify_signable,
-                                   verify_signature)
+from ..common.authenticate import sha512256, canonserialize
 
 try:
     import cPickle as pickle
@@ -165,6 +165,11 @@ class SubdirData(object):
     def cache_path_pickle(self):
         return self.cache_path_base + '.q'
 
+    @property
+    def repodata_verify_fn(self):
+        verify_base = join(create_cache_dir(), "repodata_verify.json")
+        return verify_base
+
     def load(self):
         _internal_state = self._load()
         if _internal_state.get("repodata_version", 0) > MAX_REPODATA_VERSION:
@@ -258,44 +263,39 @@ class SubdirData(object):
                                                        mod_etag_headers.get('_mod'))
             return _internal_state
         else:
-            # TODO: validate repodata here
-            # steps:
-            #   1) save to temporary location
-            #   2) check signature against repodata_verify.json
-            #   3) save repodata if all good
-            unverified_repodata_path = canonserialize(
-                self.write_unverified_to_cache(raw_repodata_str))
-            if self.validate_repodata(unverified_repodata_path):
+            unverified_repodata_path = self.write_unverified_to_cache(raw_repodata_str)
+            if self.validate_repodata(raw_repodata_str):
                 rename(unverified_repodata_path, self.cache_path_json)
             else:
-                raise
-
+                raise UntrustedRepodataError(self.url_w_repodata_fn)
             _internal_state = self._process_raw_repodata_str(raw_repodata_str)
             self._internal_state = _internal_state
             self._pickle_me()
             return _internal_state
 
-    def write_unverified_to_cache(self, raw_repodata_str):
+    def validate_repodata(self, raw_repodata_str):
+        repodata_hash = sha512256(canonserialize(raw_repodata_str))
+        secured_file_key = "%s/%s" % (self.channel.subdir, self.repodata_fn)
+        with io_open(self.repodata_verify_fn, "r") as f:
+            repodata_verify = json.loads(f.read())
+        secured_files = repodata_verify.get("secured_files")
+        if secured_files.get(secured_file_key, "") == repodata_hash:
+            return True
+        return False
+
+    def write_unverified_to_cache(self, raw_str):
         cache_path_json_unverified = "%s.unverified" % self.cache_path_json
         if not isdir(dirname(cache_path_json_unverified)):
             mkdir_p(dirname(cache_path_json_unverified))
         try:
             with io_open(cache_path_json_unverified, 'w') as fh:
-                fh.write(raw_repodata_str or '{}')
+                fh.write(raw_str or '{}')
         except (IOError, OSError) as e:
             if e.errno in (EACCES, EPERM, EROFS):
                 raise NotWritableError(cache_path_json_unverified, e.errno, caused_by=e)
             else:
                 raise
         return cache_path_json_unverified
-
-    def validate_repodata(self, unverified_repodata_path):
-        # import ipdb; ipdb.set_trace()
-        # TODO:
-        # hash unverified_repodata_path
-        # validate hash against repodata_verify.json
-
-        pass
 
     def _pickle_me(self):
         try:

@@ -1003,6 +1003,12 @@ class NoSpaceLeftError(CondaError):
         super(NoSpaceLeftError, self).__init__(message, caused_by=caused_by, **kwargs)
 
 
+class UntrustedRepodataError(CondaError):
+    def __init__(self, repodata_url):
+        msg = "Untrusted repodata %s" % repodata_url
+        super(UntrustedRepodataError, self).__init__(msg)
+
+
 def maybe_raise(error, context):
     if isinstance(error, CondaMultiError):
         groups = groupby(lambda e: isinstance(e, ClobberError), error.errors)
