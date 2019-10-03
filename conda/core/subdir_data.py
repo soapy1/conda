@@ -14,7 +14,7 @@ from io import open as io_open
 import json
 from logging import DEBUG, getLogger
 from mmap import ACCESS_READ, mmap
-from os.path import dirname, isdir, join, splitext
+from os.path import dirname, isdir, join, splitext, lexists
 from os import rename
 import re
 from time import time
@@ -167,7 +167,7 @@ class SubdirData(object):
 
     @property
     def repodata_verify_fn(self):
-        verify_base = join(create_cache_dir(), "repodata_verify.json")
+        verify_base = join(create_cache_dir(), "%s_verify.json" % self.channel.canonical_name)
         return verify_base
 
     def load(self):
@@ -267,6 +267,7 @@ class SubdirData(object):
             if self.validate_repodata(raw_repodata_str):
                 rename(unverified_repodata_path, self.cache_path_json)
             else:
+                rm_rf(unverified_repodata_path)
                 raise UntrustedRepodataError(self.url_w_repodata_fn)
             _internal_state = self._process_raw_repodata_str(raw_repodata_str)
             self._internal_state = _internal_state
@@ -276,12 +277,21 @@ class SubdirData(object):
     def validate_repodata(self, raw_repodata_str):
         repodata_hash = sha512256(canonserialize(raw_repodata_str))
         secured_file_key = "%s/%s" % (self.channel.subdir, self.repodata_fn)
+        self.fetch_or_check_repodata_verify()
         with io_open(self.repodata_verify_fn, "r") as f:
             repodata_verify = json.loads(f.read())
         secured_files = repodata_verify.get("secured_files")
         if secured_files.get(secured_file_key, "") == repodata_hash:
             return True
         return False
+
+    def fetch_or_check_repodata_verify(self):
+        if lexists(self.repodata_verify_fn):
+            # Ensure it is up to date
+            pass
+        else:
+            # Download repodata verify for the channel
+            pass
 
     def write_unverified_to_cache(self, raw_str):
         cache_path_json_unverified = "%s.unverified" % self.cache_path_json
