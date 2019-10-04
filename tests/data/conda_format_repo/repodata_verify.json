@@ -1,0 +1,26 @@
+{
+  "signatures": {},
+  "signed": {
+    "expiration": "2019-11-04T18:18:25Z",
+    "metadata_spec_version": "0.0.5",
+    "secured_files": {
+      "linux-64/current_repodata.json": "37450944496b13bec2bffef66d9af8920da3bc2b6a229f094140513263b828e3",
+      "linux-64/repodata.json": "665d8d0262f145262fe65c3b020f175e747dbb75a72f58066b5a83b5beaf0ed5",
+      "linux-64/repodata_from_packages.json": "665d8d0262f145262fe65c3b020f175e747dbb75a72f58066b5a83b5beaf0ed5",
+      "noarch/current_repodata.json": "908724926552827ab58dfc0bccba92426cec9f1f483883da3ff0d8664e18c0fe",
+      "noarch/repodata.json": "908724926552827ab58dfc0bccba92426cec9f1f483883da3ff0d8664e18c0fe",
+      "noarch/repodata_from_packages.json": "908724926552827ab58dfc0bccba92426cec9f1f483883da3ff0d8664e18c0fe",
+      "osx-64/current_repodata.json": "97c3019e53bfb234380dc37f2338c1543651bc5cd186c62c394b99083d86eab3",
+      "osx-64/repodata.json": "be20f0623e8d6c2bcd5cc8dfa4e2d3b0341a964061a27c5f4f8aa68331140537",
+      "osx-64/repodata_from_packages.json": "be20f0623e8d6c2bcd5cc8dfa4e2d3b0341a964061a27c5f4f8aa68331140537",
+      "win-32/current_repodata.json": "939a6c8fc4102bb0aeb1477f524de9395c46369bed93e83a3bbd7f0e56fcfb68",
+      "win-32/repodata.json": "a1223ae988a3206501c3762c1596d1d103240fa4e0f589236e0e1c53611c8533",
+      "win-32/repodata_from_packages.json": "a1223ae988a3206501c3762c1596d1d103240fa4e0f589236e0e1c53611c8533",
+      "win-64/current_repodata.json": "eb9b1ae48caf2f39559f9e86230cd91f45756ee992c9f1cc795885dce9fd2173",
+      "win-64/repodata.json": "6524a22a4bae15a5ac0173c82d3da7986d116c99d0f8d58cb9c61e4ffcf02bc5",
+      "win-64/repodata_from_packages.json": "6524a22a4bae15a5ac0173c82d3da7986d116c99d0f8d58cb9c61e4ffcf02bc5"
+    },
+    "timestamp": "2019-10-04T18:18:25Z",
+    "type": "repodata_verify"
+  }
+}

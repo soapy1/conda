@@ -263,8 +263,9 @@ class SubdirData(object):
                                                        mod_etag_headers.get('_mod'))
             return _internal_state
         else:
+            repodata_verify = self._get_repodata_verify(mod_etag_headers)
             unverified_repodata_path = self._write_unverified_to_cache(raw_repodata_str)
-            if self._validate_repodata(raw_repodata_str, mod_etag_headers):
+            if self._validate_repodata(raw_repodata_str, repodata_verify):
                 rename(unverified_repodata_path, self.cache_path_json)
             else:
                 rm_rf(unverified_repodata_path)
@@ -274,8 +275,7 @@ class SubdirData(object):
             self._pickle_me()
             return _internal_state
 
-    def _validate_repodata(self, raw_repodata_str, mod_etag_headers):
-        repodata_verify = self._get_repodata_verify(mod_etag_headers)
+    def _validate_repodata(self, raw_repodata_str, repodata_verify):
         # If there is no repodata_verify for the channel then that channel does not have
         # verification. Don't try to validate
         if repodata_verify is None:

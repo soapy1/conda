@@ -15,6 +15,7 @@ from conda.core.index import get_index
 from conda.core.subdir_data import Response304ContentUnchanged, cache_fn_url, read_mod_and_etag, \
     SubdirData, fetch_repodata_remote_request, UnavailableInvalidChannel
 from conda.models.channel import Channel
+from conda.exceptions import  UntrustedRepodataError
 
 try:
     from unittest.mock import patch
@@ -202,6 +203,14 @@ def test_use_only_tar_bz2():
         precs = tuple(sd.query("zlib"))
         assert precs[0].fn.endswith(".conda")
 
+
+def test_bad_validate_repodata():
+    repodata_path = join(dirname(__file__), "..", "data", "conda_format_repo")
+    channel = Channel(join(repodata_path, context.subdir))
+    with patch.object(SubdirData, '_get_repodata_verify', return_value={}) as rdv:
+        with pytest.raises(UntrustedRepodataError):
+            sd = SubdirData(channel)
+            precs = tuple(sd.query("zlib"))
 
 # @pytest.mark.integration
 # class SubdirDataTests(TestCase):
