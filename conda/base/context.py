@@ -120,6 +120,12 @@ def ssl_verify_validation(value):
     return True
 
 
+def skip_warn_error_validator(value):
+    if value in ["skip", "warn", "error"]:
+        return True
+    return False
+
+
 class Context(Configuration):
 
     add_pip_as_python_dependency = PrimitiveParameter(True)
@@ -203,6 +209,10 @@ class Context(Configuration):
     remote_max_retries = PrimitiveParameter(3)
 
     add_anaconda_token = PrimitiveParameter(True, aliases=('add_binstar_token',))
+
+    artifact_verification = PrimitiveParameter("skip",
+                                               element_type=string_types + (NoneType,),
+                                               validation=skip_warn_error_validator)
 
     # #############################
     # channels

@@ -208,9 +208,19 @@ def test_bad_validate_repodata():
     repodata_path = join(dirname(__file__), "..", "data", "conda_format_repo")
     channel = Channel(join(repodata_path, context.subdir))
     with patch.object(SubdirData, '_get_repodata_verify', return_value={}) as rdv:
-        with pytest.raises(UntrustedRepodataError):
+        with env_var('CONDA_ARTIFACT_VERIFICATION', "error", stack_callback=conda_tests_ctxt_mgmt_def_pol):
+            with pytest.raises(UntrustedRepodataError):
+                sd = SubdirData(channel)
+                precs = tuple(sd.query("zlib"))
+
+        with env_var('CONDA_ARTIFACT_VERIFICATION', "skip", stack_callback=conda_tests_ctxt_mgmt_def_pol):
             sd = SubdirData(channel)
             precs = tuple(sd.query("zlib"))
+
+        with env_var('CONDA_ARTIFACT_VERIFICATION', "warn", stack_callback=conda_tests_ctxt_mgmt_def_pol):
+            sd = SubdirData(channel)
+            precs = tuple(sd.query("zlib"))
+
 
 # @pytest.mark.integration
 # class SubdirDataTests(TestCase):

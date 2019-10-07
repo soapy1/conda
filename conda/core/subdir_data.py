@@ -276,16 +276,23 @@ class SubdirData(object):
             return _internal_state
 
     def _validate_repodata(self, raw_repodata_str, repodata_verify):
-        # If there is no repodata_verify for the channel then that channel does not have
-        # verification. Don't try to validate
+        # TODO: sort out what happens when a channel without repodata_verify is being used
+        # ref: https://github.com/awwad/conda/pull/1#discussion_r331997968
         if repodata_verify is None:
-            return True
+            repodata_verify = {}
         repodata_hash = sha512256(canonserialize(raw_repodata_str))
         secured_file_key = "%s/%s" % (self.channel.subdir, self.repodata_fn)
         secured_files = repodata_verify.get("secured_files", {})
         if secured_files.get(secured_file_key, "") == repodata_hash:
-            return True
-        return False
+            pass
+        elif context.artifact_verification == "skip":
+            pass
+        elif context.artifact_verification == "warn":
+            print("WARNING: using unverified repodata %s." % self.url_w_repodata_fn)
+            pass
+        else:
+            return False
+        return True
 
     def _get_repodata_verify(self, mod_etag_headers):
         if lexists(self.repodata_verify_fn):
