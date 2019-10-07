@@ -313,11 +313,14 @@ class SubdirData(object):
         else:
             unverified_repodata_verify_path = self._write_unverified_to_cache(
                 raw_repodata_verify_str)
-            # TODO: verify repodata_verify
-            rename(unverified_repodata_verify_path, self.repodata_verify_fn)
+            if self._verify_repodata_verify(raw_repodata_verify_str):
+                rename(unverified_repodata_verify_path, self.repodata_verify_fn)
             with io_open(self.repodata_verify_fn, "r") as f:
                 repodata_verify = json.loads(f.read())
         return repodata_verify
+
+    def _verify_repodata_verify(self, raw_repodata_str):
+        return True
 
     def _write_unverified_to_cache(self, raw_str):
         cache_path_json_unverified = "%s.unverified" % self.cache_path_json
