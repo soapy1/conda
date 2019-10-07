@@ -296,28 +296,27 @@ class SubdirData(object):
         return True
 
     def _get_repodata_verify(self, mod_etag_headers):
-        if lexists(self.repodata_verify_fn):
-            # TODO: check if repodata_verify needs to be refreshed
+        try:
+            raw_repodata_verify_str = fetch_repodata_remote_request(
+                self.url_w_credentials,
+                mod_etag_headers.get('_etag'),
+                mod_etag_headers.get('_mod'),
+                repodata_fn="repodata_verify.json")
+        except UnavailableInvalidChannel:
+            log.debug("Could not find repodata_verify.json")
+            repodata_verify = None
+        except Response304ContentUnchanged:
+            log.debug("304 NOT MODIFIED for '%s'. Updating mtime and loading from disk",
+                      self.repodata_verify_fn)
             with io_open(self.repodata_verify_fn, "r") as f:
                 repodata_verify = json.loads(f.read())
         else:
-            try:
-                raw_repodata_verify_str = fetch_repodata_remote_request(
-                    self.url_w_credentials,
-                    mod_etag_headers.get('_etag'),
-                    mod_etag_headers.get('_mod'),
-                    repodata_fn="repodata_verify.json")
-            except UnavailableInvalidChannel:
-                raw_repodata_verify_str = None
-                log.debug("Could not find repodata_verify.json")
-            if raw_repodata_verify_str is None:
-                repodata_verify = None
-            else:
-                unverified_repodata_verify_path = self._write_unverified_to_cache(
-                    raw_repodata_verify_str)
-                # TODO: verify repodata_verify
-                rename(unverified_repodata_verify_path, self.repodata_verify_fn)
-                repodata_verify = json.loads(raw_repodata_verify_str)
+            unverified_repodata_verify_path = self._write_unverified_to_cache(
+                raw_repodata_verify_str)
+            # TODO: verify repodata_verify
+            rename(unverified_repodata_verify_path, self.repodata_verify_fn)
+            with io_open(self.repodata_verify_fn, "r") as f:
+                repodata_verify = json.loads(f.read())
         return repodata_verify
 
     def _write_unverified_to_cache(self, raw_str):
