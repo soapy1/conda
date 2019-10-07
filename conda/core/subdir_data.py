@@ -167,7 +167,8 @@ class SubdirData(object):
 
     @property
     def repodata_verify_fn(self):
-        verify_base = join(create_cache_dir(), "%s_verify.json" % self.channel.canonical_name)
+        canonical_name =  self.channel.canonical_name.replace("/", "_")
+        verify_base = join(create_cache_dir(), "%s_verify.json" % canonical_name)
         return verify_base
 
     def load(self):
