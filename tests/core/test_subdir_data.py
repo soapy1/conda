@@ -221,6 +221,13 @@ def test_bad_validate_repodata():
             sd = SubdirData(channel)
             precs = tuple(sd.query("zlib"))
 
+def test_good_validate_repodata():
+    repodata_path = join(dirname(__file__), "..", "data", "conda_format_repo")
+    channel = Channel(join(repodata_path, context.subdir))
+    sd = SubdirData(channel)
+    sd.query("zlib")
+    assert len(tuple(sd.query("zlib"))) == 1
+
 
 # @pytest.mark.integration
 # class SubdirDataTests(TestCase):
