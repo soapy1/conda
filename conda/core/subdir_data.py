@@ -314,9 +314,8 @@ class SubdirData(object):
     def _verify_repodata_verify(self, raw_repodata_str):
         return True
 
-    def _verify_repodata(self, raw_repodata_str):
-        repodata_verify = self._get_repodata_verify()
-        expiration = repodata_verify.get("signed", {}).get("expiration", None)
+    def _check_repodata_not_expired(self, repodata):
+        expiration = repodata.get("signed", {}).get("expiration", None)
         if expiration:
             exp = datetime.strptime(expiration, "%Y-%m-%dT%H:%M:%S%z")
             now = datetime.now().astimezone()
@@ -324,6 +323,9 @@ class SubdirData(object):
                 raise ExpiredRepodataError(self.repodata_verify_fn, expiration)
         else:
             raise ExpiredRepodataError(self.repodata_verify_fn, expiration)
+
+    def _verify_repodata(self, raw_repodata_str):
+        repodata_verify = self._get_repodata_verify()
         # TODO: sort out what happens when a channel without repodata_verify is being used
         # ref: https://github.com/awwad/conda/pull/1#discussion_r331997968
         if repodata_verify is None:
@@ -332,6 +334,7 @@ class SubdirData(object):
         secured_file_key = "%s/%s" % (self.channel.subdir, self.repodata_fn)
         secured_files = repodata_verify.get("secured_files", {})
         if secured_files.get(secured_file_key, "") == repodata_hash:
+            self._check_repodata_not_expired(repodata_verify)
             return True
         elif context.artifact_verification == "skip":
             return True
@@ -339,6 +342,7 @@ class SubdirData(object):
             print("WARNING: using unverified repodata %s." % self.url_w_repodata_fn)
             return True
         else:
+            self._check_repodata_not_expired(repodata_verify)
             raise UntrustedRepodataError(self.url_w_repodata_fn)
 
     def _write_unverified_to_cache(self, raw_str):
