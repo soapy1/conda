@@ -4,6 +4,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from logging import getLogger
 from os.path import dirname, join
 from unittest import TestCase
+from unittest.mock import patch
 
 import pytest
 
@@ -211,15 +212,18 @@ def test_bad_validate_repodata():
         with env_var('CONDA_ARTIFACT_VERIFICATION', "error", stack_callback=conda_tests_ctxt_mgmt_def_pol):
             with pytest.raises(UntrustedRepodataError):
                 sd = SubdirData(channel)
-                precs = tuple(sd.query("zlib"))
+                tuple(sd.query("zlib"))
+                assert rdv.call_count == 1
 
         with env_var('CONDA_ARTIFACT_VERIFICATION', "skip", stack_callback=conda_tests_ctxt_mgmt_def_pol):
             sd = SubdirData(channel)
-            precs = tuple(sd.query("zlib"))
+            tuple(sd.query("zlib"))
+            assert rdv.call_count == 2
 
         with env_var('CONDA_ARTIFACT_VERIFICATION', "warn", stack_callback=conda_tests_ctxt_mgmt_def_pol):
             sd = SubdirData(channel)
-            precs = tuple(sd.query("zlib"))
+            tuple(sd.query("zlib"))
+            assert rdv.call_count == 3
 
 def test_good_validate_repodata():
     repodata_path = join(dirname(__file__), "..", "data", "conda_format_repo")
@@ -228,6 +232,21 @@ def test_good_validate_repodata():
     sd.query("zlib")
     assert len(tuple(sd.query("zlib"))) == 1
 
+
+def test_validate_repodata_change_verification():
+    repodata_path = join(dirname(__file__), "..", "data", "conda_format_repo")
+    channel = Channel(join(repodata_path, context.subdir))
+    with patch.object(SubdirData, '_get_repodata_verify', return_value={}) as rdv:
+        with env_var('CONDA_ARTIFACT_VERIFICATION', "skip", stack_callback=conda_tests_ctxt_mgmt_def_pol):
+            sd = SubdirData(channel)
+            tuple(sd.query("zlib"))
+            assert rdv.call_count == 1
+
+        with env_var('CONDA_ARTIFACT_VERIFICATION', "error", stack_callback=conda_tests_ctxt_mgmt_def_pol):
+            with pytest.raises(UntrustedRepodataError):
+                sd = SubdirData(channel)
+                tuple(sd.query("zlib"))
+                assert rdv.call_count == 2
 
 # @pytest.mark.integration
 # class SubdirDataTests(TestCase):

@@ -167,7 +167,7 @@ class SubdirData(object):
 
     @property
     def repodata_verify_fn(self):
-        canonical_name =  self.channel.canonical_name.replace("/", "_")
+        canonical_name = self.channel.canonical_name.replace("/", "_")
         verify_base = join(create_cache_dir(), "%s_verify.json" % canonical_name)
         return verify_base
 
@@ -240,10 +240,8 @@ class SubdirData(object):
 
             log.debug("Local cache timed out for %s at %s",
                       self.url_w_repodata_fn, self.cache_path_json)
-
-
         try:
-           raw_repodata_str = self._download_repodata(mod_etag_headers)
+            raw_repodata_str = self._download_repodata(mod_etag_headers)
         except UnavailableInvalidChannel:
             if self.repodata_fn != REPODATA_FN:
                 self.repodata_fn = REPODATA_FN
@@ -255,10 +253,12 @@ class SubdirData(object):
                       self.url_w_repodata_fn)
             touch(self.cache_path_json)
         else:
+            if not isdir(dirname(self.cache_path_json)):
+                mkdir_p(dirname(self.cache_path_json))
             try:
                 with io_open(self.cache_path_json, 'w') as fh:
                     fh.write(raw_repodata_str or '{}')
-            except(IOError, OSError) as e:
+            except (IOError, OSError) as e:
                 if e.errno in (EACCES, EPERM, EROFS):
                     raise NotWritableError(self.cache_path_json, e.errno, caused_by=e)
                 else:
@@ -272,7 +272,6 @@ class SubdirData(object):
                                                     mod_etag_headers.get('_mod'))
         return _internal_state
 
-
     def _download_repodata(self, mod_etag_headers):
         raw_repodata_str = fetch_repodata_remote_request(
             self.url_w_credentials,
@@ -282,7 +281,6 @@ class SubdirData(object):
         # empty file
         if not raw_repodata_str and self.repodata_fn != REPODATA_FN:
             raise UnavailableInvalidChannel(self.url_w_repodata_fn, 404)
-
         self._download_and_verify_repodata_verify(mod_etag_headers)
         return raw_repodata_str
 
@@ -304,7 +302,19 @@ class SubdirData(object):
             if self._verify_repodata_verify(raw_repodata_verify_str):
                 rename(unverified_repodata_verify_path, self.repodata_verify_fn)
 
-    def _validate_repodata(self, raw_repodata_str, repodata_verify):
+    def _get_repodata_verify(self):
+        if lexists(self.repodata_verify_fn):
+            with io_open(self.repodata_verify_fn, "r") as f:
+                repodata_verify = json.loads(f.read())
+        else:
+            repodata_verify = None
+        return repodata_verify
+
+    def _verify_repodata_verify(self, raw_repodata_str):
+        return True
+
+    def _verify_repodata(self, raw_repodata_str):
+        repodata_verify = self._get_repodata_verify()
         # TODO: sort out what happens when a channel without repodata_verify is being used
         # ref: https://github.com/awwad/conda/pull/1#discussion_r331997968
         if repodata_verify is None:
@@ -320,24 +330,6 @@ class SubdirData(object):
             print("WARNING: using unverified repodata %s." % self.url_w_repodata_fn)
             pass
         else:
-            return False
-        return True
-
-
-    def _get_repodata_verify(self):
-        if lexists(self.repodata_verify_fn):
-            with io_open(self.repodata_verify_fn, "r") as f:
-                repodata_verify = json.loads(f.read())
-        else:
-            repodata_verify = None
-        return repodata_verify
-
-    def _verify_repodata_verify(self, raw_repodata_str):
-        return True
-
-    def _verify_repodata(self, raw_repodata_str):
-        repodata_verify = self._get_repodata_verify()
-        if not self._validate_repodata(raw_repodata_str, repodata_verify):
             raise UntrustedRepodataError(self.url_w_repodata_fn)
 
     def _write_unverified_to_cache(self, raw_str):
