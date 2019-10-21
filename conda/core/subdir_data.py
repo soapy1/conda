@@ -219,8 +219,8 @@ class SubdirData(object):
                 log.debug("Using cached repodata for %s at %s because use_cache=True",
                           self.url_w_repodata_fn, self.cache_path_json)
 
-                _internal_state = self._read_local_repdata(mod_etag_headers.get('_etag'),
-                                                           mod_etag_headers.get('_mod'))
+                _internal_state = self._read_local_repodata(mod_etag_headers.get('_etag'),
+                                                            mod_etag_headers.get('_mod'))
                 return _internal_state
 
             if context.local_repodata_ttl > 1:
@@ -234,8 +234,8 @@ class SubdirData(object):
             if (timeout > 0 or context.offline) and not self.url_w_subdir.startswith('file://'):
                 log.debug("Using cached repodata for %s at %s. Timeout in %d sec",
                           self.url_w_repodata_fn, self.cache_path_json, timeout)
-                _internal_state = self._read_local_repdata(mod_etag_headers.get('_etag'),
-                                                           mod_etag_headers.get('_mod'))
+                _internal_state = self._read_local_repodata(mod_etag_headers.get('_etag'),
+                                                            mod_etag_headers.get('_mod'))
                 return _internal_state
 
             log.debug("Local cache timed out for %s at %s",
@@ -243,7 +243,7 @@ class SubdirData(object):
 
 
         try:
-            raw_repodata_str = self._download_repodata(mod_etag_headers)
+           raw_repodata_str = self._download_repodata(mod_etag_headers)
         except UnavailableInvalidChannel:
             if self.repodata_fn != REPODATA_FN:
                 self.repodata_fn = REPODATA_FN
@@ -254,21 +254,24 @@ class SubdirData(object):
             log.debug("304 NOT MODIFIED for '%s'. Updating mtime and loading from disk",
                       self.url_w_repodata_fn)
             touch(self.cache_path_json)
-            _internal_state = self._read_local_repdata(mod_etag_headers.get('_etag'),
-                                                       mod_etag_headers.get('_mod'))
-            return _internal_state
         else:
-            repodata_verify = self._get_repodata_verify()
-            unverified_repodata_path = self._write_unverified_to_cache(raw_repodata_str)
-            if self._validate_repodata(raw_repodata_str, repodata_verify):
-                rename(unverified_repodata_path, self.cache_path_json)
-            else:
-                rm_rf(unverified_repodata_path)
-                raise UntrustedRepodataError(self.url_w_repodata_fn)
+            try:
+                with io_open(self.cache_path_json, 'w') as fh:
+                    fh.write(raw_repodata_str or '{}')
+            except(IOError, OSError) as e:
+                if e.errno in (EACCES, EPERM, EROFS):
+                    raise NotWritableError(self.cache_path_json, e.errno, caused_by=e)
+                else:
+                    raise
+            self._verify_repodata(raw_repodata_str)
             _internal_state = self._process_raw_repodata_str(raw_repodata_str)
             self._internal_state = _internal_state
             self._pickle_me()
             return _internal_state
+        _internal_state = self._read_local_repodata(mod_etag_headers.get('_etag'),
+                                                    mod_etag_headers.get('_mod'))
+        return _internal_state
+
 
     def _download_repodata(self, mod_etag_headers):
         raw_repodata_str = fetch_repodata_remote_request(
@@ -332,6 +335,11 @@ class SubdirData(object):
     def _verify_repodata_verify(self, raw_repodata_str):
         return True
 
+    def _verify_repodata(self, raw_repodata_str):
+        repodata_verify = self._get_repodata_verify()
+        if not self._validate_repodata(raw_repodata_str, repodata_verify):
+            raise UntrustedRepodataError(self.url_w_repodata_fn)
+
     def _write_unverified_to_cache(self, raw_str):
         cache_path_json_unverified = "%s.unverified" % self.cache_path_json
         if not isdir(dirname(cache_path_json_unverified)):
@@ -355,7 +363,7 @@ class SubdirData(object):
         except Exception:
             log.debug("Failed to dump pickled repodata.", exc_info=True)
 
-    def _read_local_repdata(self, etag, mod_stamp):
+    def _read_local_repodata(self, etag, mod_stamp):
         # first try reading pickled data
         _pickled_state = self._read_pickled(etag, mod_stamp)
         if _pickled_state:
@@ -375,11 +383,11 @@ class SubdirData(object):
                 so they can be downloaded again.
                 """)
                 raise CondaError(message)
-            else:
-                _internal_state = self._process_raw_repodata_str(raw_repodata_str)
-                self._internal_state = _internal_state
-                self._pickle_me()
-                return _internal_state
+        self._verify_repodata(raw_repodata_str)
+        _internal_state = self._process_raw_repodata_str(raw_repodata_str)
+        self._internal_state = _internal_state
+        self._pickle_me()
+        return _internal_state
 
     def _read_pickled(self, etag, mod_stamp):
 
@@ -411,6 +419,7 @@ class SubdirData(object):
                       self.url_w_repodata_fn, self.cache_path_json)
             return None
 
+        self._verify_repodata(str(_pickled_state))
         return _pickled_state
 
     def _process_raw_repodata_str(self, raw_repodata_str):
