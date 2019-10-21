@@ -4,7 +4,6 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 from logging import getLogger
 from os.path import dirname, join
 from unittest import TestCase
-from unittest.mock import patch
 
 import pytest
 
@@ -16,7 +15,7 @@ from conda.core.index import get_index
 from conda.core.subdir_data import Response304ContentUnchanged, cache_fn_url, read_mod_and_etag, \
     SubdirData, fetch_repodata_remote_request, UnavailableInvalidChannel
 from conda.models.channel import Channel
-from conda.exceptions import  UntrustedRepodataError
+from conda.exceptions import  UntrustedRepodataError, ExpiredRepodataError
 
 try:
     from unittest.mock import patch
@@ -247,6 +246,22 @@ def test_validate_repodata_change_verification():
                 sd = SubdirData(channel)
                 tuple(sd.query("zlib"))
                 assert rdv.call_count == 2
+
+def test_outdated_repodata_verify():
+    repodata_path = join(dirname(__file__), "..", "data", "conda_format_repo")
+    channel = Channel(join(repodata_path, context.subdir))
+    repodata_verify = {
+          "signatures": {},
+          "signed": {
+            "expiration": "2017-11-04T18:18:25Z",
+          }
+        }
+    with patch.object(SubdirData, '_get_repodata_verify', return_value=repodata_verify) as rdv:
+        with env_var('CONDA_ARTIFACT_VERIFICATION', "error", stack_callback=conda_tests_ctxt_mgmt_def_pol):
+            with pytest.raises(ExpiredRepodataError):
+                sd = SubdirData(channel)
+                tuple(sd.query("zlib"))
+
 
 # @pytest.mark.integration
 # class SubdirDataTests(TestCase):

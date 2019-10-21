@@ -1,7 +1,7 @@
 {
   "signatures": {},
   "signed": {
-    "expiration": "2019-11-04T18:18:25Z",
+    "expiration": "2119-11-04T18:18:25Z",
     "metadata_spec_version": "0.0.5",
     "secured_files": {
       "linux-64/current_repodata.json": "37450944496b13bec2bffef66d9af8920da3bc2b6a229f094140513263b828e3",

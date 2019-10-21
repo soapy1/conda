@@ -19,6 +19,7 @@ from os import rename
 import re
 from time import time
 import warnings
+from datetime import datetime
 
 from .. import CondaError
 from .._vendor.auxlib.ish import dals
@@ -33,7 +34,7 @@ from ..common.url import join_url, maybe_unquote
 from ..core.package_cache_data import PackageCacheData
 from ..exceptions import (CondaDependencyError, CondaHTTPError, CondaUpgradeError,
                           NotWritableError, UnavailableInvalidChannel, ProxyError,
-                          UntrustedRepodataError)
+                          UntrustedRepodataError, ExpiredRepodataError)
 from ..gateways.connection import (ConnectionError, HTTPError, InsecureRequestWarning,
                                    InvalidSchema, SSLError, RequestsProxyError)
 from ..gateways.connection.session import CondaSession
@@ -315,6 +316,14 @@ class SubdirData(object):
 
     def _verify_repodata(self, raw_repodata_str):
         repodata_verify = self._get_repodata_verify()
+        expiration = repodata_verify.get("signed", {}).get("expiration", None)
+        if expiration:
+            exp = datetime.strptime(expiration, "%Y-%m-%dT%H:%M:%S%z")
+            now = datetime.now().astimezone()
+            if now > exp:
+                raise ExpiredRepodataError(self.repodata_verify_fn, expiration)
+        else:
+            raise ExpiredRepodataError(self.repodata_verify_fn, expiration)
         # TODO: sort out what happens when a channel without repodata_verify is being used
         # ref: https://github.com/awwad/conda/pull/1#discussion_r331997968
         if repodata_verify is None:
@@ -323,12 +332,12 @@ class SubdirData(object):
         secured_file_key = "%s/%s" % (self.channel.subdir, self.repodata_fn)
         secured_files = repodata_verify.get("secured_files", {})
         if secured_files.get(secured_file_key, "") == repodata_hash:
-            pass
+            return True
         elif context.artifact_verification == "skip":
-            pass
+            return True
         elif context.artifact_verification == "warn":
             print("WARNING: using unverified repodata %s." % self.url_w_repodata_fn)
-            pass
+            return True
         else:
             raise UntrustedRepodataError(self.url_w_repodata_fn)
 

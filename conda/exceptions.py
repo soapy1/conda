@@ -1008,6 +1008,10 @@ class UntrustedRepodataError(CondaError):
         msg = "Untrusted repodata %s" % repodata_url
         super(UntrustedRepodataError, self).__init__(msg)
 
+class ExpiredRepodataError(CondaError):
+    def __init__(self, repodata_path, expiry):
+        msg = "Repodata file %s has expired on %s" % (repodata_path, expiry)
+        super(ExpiredRepodataError, self).__init__(msg)
 
 def maybe_raise(error, context):
     if isinstance(error, CondaMultiError):
