@@ -29,7 +29,7 @@
       "license_family": "Other",
       "md5": "2e5b81671cc2b53177b94b258b1658b2",
       "name": "zlib",
-       "sha256": "1f07873d6aa0cd18760a7b215d9956f7fa63c2f2761b03f293c659fe982923fa",
+      "sha256": "1f07873d6aa0cd18760a7b215d9956f7fa63c2f2761b03f293c659fe982923fa",
       "size": 122456,
       "subdir": "linux-64",
       "timestamp": 1542814864621,
