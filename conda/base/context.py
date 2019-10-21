@@ -804,6 +804,7 @@ class Context(Configuration):
             'envs_dirs',
             'pkgs_dirs',
             'default_threads',
+            'artifact_verification',
         )),
         ('Network Configuration', (
             'client_ssl_cert',
@@ -948,6 +949,10 @@ class Context(Configuration):
             'anaconda_upload': dals("""
                 Automatically upload packages built with conda build to anaconda.org.
                 """),
+            'artifact_verification': dals("""
+                Level of error controlling the extent at which conda will verify the validity
+                of repodata. Can be set to 'error', 'warn' or 'skip'.
+            """),
             'auto_activate_base': dals("""
                 Automatically activate the base environment during shell initialization.
                 """),
