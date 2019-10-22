@@ -241,7 +241,13 @@ def test_good_validate_repodata():
 def test_validate_repodata_change_verification():
     repodata_path = join(dirname(__file__), "..", "data", "conda_format_repo")
     channel = Channel(join(repodata_path, context.subdir))
-    with patch.object(SubdirData, '_get_repodata_verify', return_value={}) as rdv:
+    repodata_verify = {
+        "signatures": {},
+        "signed": {
+            "expiration": "2117-11-04T18:18:25Z",
+        }
+    }
+    with patch.object(SubdirData, '_get_repodata_verify', return_value=repodata_verify) as rdv:
         with env_var('CONDA_ARTIFACT_VERIFICATION', "skip", stack_callback=conda_tests_ctxt_mgmt_def_pol):
             sd = SubdirData(channel)
             tuple(sd.query("zlib"))
