@@ -740,7 +740,7 @@ class PackagesNotFoundError(CondaError):
         )
 
 
-class PackagesNotInstalledError(PackagesNotFoundError):
+class PackagesNotInstalledError(CondaError):
     def __init__(self, prefix, packages):
         format_list = lambda iterable: "  - " + "\n  - ".join(str(x) for x in iterable)
 
@@ -748,7 +748,8 @@ class PackagesNotInstalledError(PackagesNotFoundError):
             """
         Package is not installed in prefix.
           prefix: %(prefix)s
-          package name: %(packages_formatted)s
+          packags:
+          %(packages_formatted)s
         """
         )
         packages_formatted = format_list(packages)
