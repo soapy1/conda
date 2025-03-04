@@ -46,6 +46,7 @@ from ..exceptions import (
     NoBaseEnvironmentError,
     OperationNotAllowed,
     PackageNotInstalledError,
+    PackagesNotInstalledError,
     PackagesNotFoundError,
     ResolvePackageNotFound,
     SpecsConfigurationConflictError,
@@ -517,6 +518,7 @@ def revert_actions(prefix, revision=-1, index=None):
             link_precs.add(precs[0])
 
     if not_found_in_index_specs:
+        # TODO: soph - come back to this
         raise PackagesNotFoundError(not_found_in_index_specs)
 
     final_precs = IndexedSet(PrefixGraph(link_precs).graph)  # toposort
@@ -529,7 +531,7 @@ def handle_txn(unlink_link_transaction, prefix, args, newenv, remove_op=False):
     if unlink_link_transaction.nothing_to_do:
         if remove_op:
             # No packages found to remove from environment
-            raise PackagesNotFoundError(args.package_names)
+            raise PackagesNotInstalledError(prefix, args.package_names)
         elif not newenv:
             if context.json:
                 common.stdout_json_success(

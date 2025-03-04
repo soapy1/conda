@@ -25,7 +25,7 @@ from .exceptions import (
     CondaExitZero,
     DisallowedPackageError,
     DryRunExit,
-    PackagesNotFoundError,
+    PackagesNotInstalledError,
     ParseError,
 )
 from .gateways.disk.delete import rm_rf
@@ -298,7 +298,7 @@ def clone_env(prefix1, prefix2, verbose=True, quiet=False, index_args=None):
                 drecs.remove(prec)
                 drecs.add(precs[0])
     if notfound:
-        raise PackagesNotFoundError(notfound)
+        raise PackagesNotInstalledError(prefix1, notfound)
 
     # Assemble the URL and channel list
     urls = {}
