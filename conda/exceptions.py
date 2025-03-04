@@ -687,18 +687,6 @@ class AuthenticationError(CondaError):
     pass
 
 
-class PackageNotInstalledError(CondaError):
-    def __init__(self, prefix, package_name):
-        message = dals(
-            """
-        Package is not installed in prefix.
-          prefix: %(prefix)s
-          package name: %(package_name)s
-        """
-        )
-        super().__init__(message, prefix=prefix, package_name=package_name)
-
-
 class PackagesNotFoundError(CondaError):
     def __init__(self, packages, channel_urls=()):
         format_list = lambda iterable: "  - " + "\n  - ".join(str(x) for x in iterable)
@@ -752,7 +740,7 @@ class PackagesNotFoundError(CondaError):
         )
 
 
-class PackagesNotInstalledError(PackagesNotFoundError, PackageNotInstalledError):
+class PackagesNotInstalledError(PackagesNotFoundError):
     def __init__(self, prefix, packages):
         format_list = lambda iterable: "  - " + "\n  - ".join(str(x) for x in iterable)
 

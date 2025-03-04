@@ -51,7 +51,7 @@ from conda.exceptions import (
     EnvironmentNotWritableError,
     LinkError,
     OperationNotAllowed,
-    PackageNotInstalledError,
+    PackagesNotInstalledError,
     PackagesNotFoundError,
     RemoveError,
     SpecsConfigurationConflictError,
@@ -511,7 +511,7 @@ def test_conda_update_package_not_installed(
             "update",
             f"--prefix={prefix}",
             "test-test-test",
-            raises=PackageNotInstalledError,
+            raises=PackagesNotInstalledError,
         )
 
         with pytest.raises(CondaError, match="Invalid spec for 'conda update'"):

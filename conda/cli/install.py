@@ -45,7 +45,6 @@ from ..exceptions import (
     EnvironmentLocationNotFound,
     NoBaseEnvironmentError,
     OperationNotAllowed,
-    PackageNotInstalledError,
     PackagesNotInstalledError,
     PackagesNotFoundError,
     ResolvePackageNotFound,
@@ -332,7 +331,7 @@ def install(args, parser, command="install"):
                     "Use 'conda install' instead."
                 )
             if not prefix_data.get(spec.name, None):
-                raise PackageNotInstalledError(prefix, spec.name)
+                raise PackagesNotInstalledError(prefix, [spec.name])
 
     if newenv and args.clone:
         if args.packages:
