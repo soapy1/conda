@@ -174,6 +174,11 @@ def get_revision(arg, json=False):
 
 def install(args, parser, command="install"):
     """Logic for `conda install`, `conda update`, and `conda create`."""
+    from ..env import specs as env_specs
+    from ..env.env import get_filename
+    from ..env.specs import detect as detect_input_file
+    from ..env.specs.yaml_file import YamlFileSpec
+
     context.validate_configuration()
     check_non_admin()
     # this is sort of a hack.  current_repodata.json may not have any .tar.bz2 files,
@@ -287,15 +292,27 @@ def install(args, parser, command="install"):
             )
 
     specs = []
+    pip_specs = []
     if args.file:
-        for fpath in args.file:
-            try:
-                specs.extend(common.specs_from_url(fpath, json=context.json))
-            except UnicodeError:
-                raise CondaError(
-                    "Error reading file, file should be a text file containing"
-                    " packages \nconda create --help for details"
+        for idx, fpath in enumerate(args.file):
+            parsed = detect_input_file(name=Path(prefix).name, filename=fpath)
+            if isinstance(parsed, YamlFileSpec):
+                if idx != 0:
+                    # We only allow a single --file to be a YAML file (for now)
+                    raise CondaError("YAML files can only be passed as the single --file argument."
                 )
+                log.warning("YAML support in 'conda {create,install,update,remove} --file' is experimental")
+                # get conda specs
+                specs.extend(parsed.environment.dependencies["conda"])
+                pip_specs = parsed.environment.dependencies["pip"]
+            else:
+                try:
+                    specs.extend(common.specs_from_url(fpath, json=context.json))
+                except UnicodeError:
+                    raise CondaError(
+                        "Error reading file, file should be a text file containing"
+                        " packages \nconda create --help for details"
+                    )
         if "@EXPLICIT" in specs:
             explicit(specs, prefix, verbose=not context.quiet)
             if newenv:
@@ -476,7 +493,7 @@ def install(args, parser, command="install"):
                 if e.args and "could not import" in e.args[0]:
                     raise CondaImportError(str(e))
                 raise e
-    handle_txn(unlink_link_transaction, prefix, args, newenv)
+    handle_txn(unlink_link_transaction, prefix, args, newenv, pip_specs=pip_specs)
 
 
 def revert_actions(prefix, revision=-1, index=None):
@@ -517,7 +534,10 @@ def revert_actions(prefix, revision=-1, index=None):
     return UnlinkLinkTransaction(setup)
 
 
-def handle_txn(unlink_link_transaction, prefix, args, newenv, remove_op=False):
+def handle_txn(unlink_link_transaction, prefix, args, newenv, remove_op=False, pip_specs=[]):
+    from ..env.installers.base import get_installer
+    from ..env.env import print_result
+
     if unlink_link_transaction.nothing_to_do:
         if remove_op:
             # No packages found to remove from environment
@@ -551,6 +571,10 @@ def handle_txn(unlink_link_transaction, prefix, args, newenv, remove_op=False):
 
     except SystemExit as e:
         raise CondaSystemExit("Exiting", e)
+    
+    if len(pip_specs) > 0:
+        installer = get_installer("pip")
+        pip_install_result = installer.install_2(prefix, pip_specs, args)
 
     if newenv:
         touch_nonadmin(prefix)
