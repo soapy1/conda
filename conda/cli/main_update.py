@@ -88,7 +88,20 @@ def configure_parser(sub_parsers: _SubParsersAction, **kwargs) -> ArgumentParser
 @notices
 def execute(args: Namespace, parser: ArgumentParser) -> int:
     from ..base.context import context
+    from ..base.constants import UpdateModifier
     from .install import install
+    from ..exceptions import CondaValueError
+
+    if not (
+        args.file
+        or args.package
+        or context.update_modified == UpdateModifier.UPDATE_ALL
+    ):
+        raise CondaValueError(
+            """no package names supplied
+# Example: conda update -n myenv scipy
+"""
+        )
 
     if context.force:
         print(

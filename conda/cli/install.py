@@ -178,6 +178,7 @@ def install(args, parser, command="install"):
     from ..env.env import get_filename
     from ..env.specs import detect as detect_input_file
     from ..env.specs.yaml_file import YamlFileSpec
+    from ..gateways.disk.test import is_conda_environment
 
     context.validate_configuration()
     check_non_admin()
@@ -192,62 +193,14 @@ def install(args, parser, command="install"):
     isinstall = bool(command == "install")
     isremove = bool(command == "remove")
     prefix = context.target_prefix
+
     if context.force_32bit and prefix == context.root_prefix:
         raise CondaValueError("cannot use CONDA_FORCE_32BIT=1 in base env")
-    if isupdate and not (
-        args.file
-        or args.packages
-        or context.update_modifier == UpdateModifier.UPDATE_ALL
-    ):
-        raise CondaValueError(
-            """no package names supplied
-# Example: conda update -n myenv scipy
-"""
-        )
 
-    if newenv:
-        check_prefix(prefix, json=context.json)
-        if context.subdir != context._native_subdir():
-            # We will only allow a different subdir if it's specified by global
-            # configuration, environment variable or command line argument. IOW,
-            # prevent a non-base env configured for a non-native subdir from leaking
-            # its subdir to a newer env.
-            context_sources = context.collect_all()
-            if context_sources.get("cmd_line", {}).get("subdir") == context.subdir:
-                pass  # this is ok
-            elif context_sources.get("envvars", {}).get("subdir") == context.subdir:
-                pass  # this is ok too
-            # config does not come from envvars or cmd_line, it must be a file
-            # that's ok as long as it's a base env or a global file
-            elif not paths_equal(context.active_prefix, context.root_prefix):
-                # this is only ok as long as it's base environment
-                active_env_config = next(
-                    (
-                        config
-                        for path, config in context_sources.items()
-                        if paths_equal(context.active_prefix, path.parent)
-                    ),
-                    None,
-                )
-                if active_env_config.get("subdir") == context.subdir:
-                    # In practice this never happens; the subdir info is not even
-                    # loaded from the active env for conda create :shrug:
-                    msg = dals(
-                        f"""
-                        Active environment configuration ({context.active_prefix}) is
-                        implicitly requesting a non-native platform ({context.subdir}).
-                        Please deactivate first or explicitly request the platform via
-                        the --platform=[value] command line flag.
-                        """
-                    )
-                    raise OperationNotAllowed(msg)
-            log.info(
-                "Creating new environment for a non-native platform %s",
-                context.subdir,
-            )
-    elif isdir(prefix):
+    # TODO: not sure if this (not newenv) bit is needed?
+    if (not newenv) and isdir(prefix):
         delete_trash(prefix)
-        if not isfile(join(prefix, "conda-meta", "history")):
+        if not is_conda_environment(prefix):
             if paths_equal(prefix, context.conda_prefix):
                 raise NoBaseEnvironmentError()
             else:
@@ -294,6 +247,8 @@ def install(args, parser, command="install"):
     specs = []
     pip_specs = []
     parsed_env_file = None
+    # TODO: should be pulling in all the packges for install around the same time
+    # that means parsing any provided environment.yaml files and other provided files
     if args.file:
         for idx, fpath in enumerate(args.file):
             parsed_env_file = detect_input_file(name=Path(prefix).name, filename=fpath)
@@ -322,13 +277,6 @@ def install(args, parser, command="install"):
             return
     specs.extend(common.specs_from_args(args_packages, json=context.json))
 
-    if isinstall and args.revision:
-        get_revision(args.revision, json=context.json)
-    elif isinstall and not (args.file or args_packages):
-        raise CondaValueError(
-            "too few arguments, must supply command line package specs or --file"
-        )
-
     # for 'conda update', make sure the requested specs actually exist in the prefix
     # and that they are name-only specs
     if isupdate and context.update_modifier != UpdateModifier.UPDATE_ALL:
@@ -344,14 +292,6 @@ def install(args, parser, command="install"):
                 raise PackageNotInstalledError(prefix, spec.name)
 
     if newenv and args.clone:
-        if args.packages:
-            raise TooManyArgumentsError(
-                0,
-                len(args.packages),
-                list(args.packages),
-                "did not expect any arguments for --clone",
-            )
-
         clone(
             args.clone,
             prefix,

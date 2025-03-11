@@ -125,7 +125,8 @@ def configure_parser(sub_parsers: _SubParsersAction, **kwargs) -> ArgumentParser
 @notices
 def execute(args: Namespace, parser: ArgumentParser) -> int:
     from ..base.context import context
-    from .install import install
+    from .install import install, get_revision
+    from ..exceptions import CondaValueError
 
     if context.force:
         print(
@@ -135,6 +136,13 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
             "         and --clobber flags.\n"
             "\n",
             file=sys.stderr,
+        )
+
+    if args.revision:
+        get_revision(args.revision, json=context.json)
+    elif not (args.file or args.packages):
+        raise CondaValueError(
+            "too few arguments, must supply command line package specs or --file"
         )
 
     return install(args, parser, "install")

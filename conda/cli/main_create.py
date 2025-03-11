@@ -11,6 +11,7 @@ from logging import getLogger
 from os.path import isdir
 from typing import TYPE_CHECKING
 
+from ..auxlib.ish import dals
 from ..notices import notices
 
 if TYPE_CHECKING:
@@ -93,7 +94,7 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
     from ..base.context import context
     from ..cli.main_rename import check_protected_dirs
     from ..common.path import paths_equal
-    from ..exceptions import ArgumentError, CondaValueError
+    from ..exceptions import ArgumentError, CondaValueError, OperationNotAllowed, TooManyArgumentsError
     from ..gateways.disk.delete import rm_rf
     from ..gateways.disk.test import is_conda_environment
     from ..reporters import confirm_yn
@@ -104,11 +105,14 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
             args.prefix = os.path.join(mktemp(), UNUSED_ENV_NAME)
             context.__init__(argparse_args=args)
         else:
+            # TODO: check if a environment.yaml file is provided. If
+            # so, then no need to specify -n/-p
             raise ArgumentError(
                 "one of the arguments -n/--name -p/--prefix is required"
             )
 
     check_protected_dirs(context.target_prefix)
+    check_prefix(context.target_prefix, json=context.json)
 
     if is_conda_environment(context.target_prefix):
         if paths_equal(context.target_prefix, context.root_prefix):
@@ -138,5 +142,53 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
             default="no",
             dry_run=False,
         )
+
+    if context.subdir != context._native_subdir():
+        # We will only allow a different subdir if it's specified by global
+        # configuration, environment variable or command line argument. IOW,
+        # prevent a non-base env configured for a non-native subdir from leaking
+        # its subdir to a newer env.
+        context_sources = context.collect_all()
+        if context_sources.get("cmd_line", {}).get("subdir") == context.subdir:
+            pass  # this is ok
+        elif context_sources.get("envvars", {}).get("subdir") == context.subdir:
+            pass  # this is ok too
+        # config does not come from envvars or cmd_line, it must be a file
+        # that's ok as long as it's a base env or a global file
+        elif not paths_equal(context.active_prefix, context.root_prefix):
+            # this is only ok as long as it's base environment
+            active_env_config = next(
+                (
+                    config
+                    for path, config in context_sources.items()
+                    if paths_equal(context.active_prefix, path.parent)
+                ),
+                None,
+            )
+            if active_env_config.get("subdir") == context.subdir:
+                # In practice this never happens; the subdir info is not even
+                # loaded from the active env for conda create :shrug:
+                msg = dals(
+                    f"""
+                    Active environment configuration ({context.active_prefix}) is
+                    implicitly requesting a non-native platform ({context.subdir}).
+                    Please deactivate first or explicitly request the platform via
+                    the --platform=[value] command line flag.
+                    """
+                )
+                raise OperationNotAllowed(msg)
+        log.info(
+            "Creating new environment for a non-native platform %s",
+            context.subdir,
+        )
+
+    # TODO: maybe there is a better way to handle mutually exclusive args
+    if args.clone and args.package:
+         raise TooManyArgumentsError(
+                0,
+                len(args.packages),
+                list(args.packages),
+                "did not expect any arguments for --clone",
+            )
 
     return install(args, parser, "create")
