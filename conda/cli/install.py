@@ -213,10 +213,9 @@ def install(args, parser, command="install"):
     4. solve + install the environment
     6. apply post install actions (includes installing pip packages)
     """
-    from ..env import specs as env_specs
-    from ..env.env import get_filename
     from ..env.specs import detect as detect_input_file
     from ..env.specs.yaml_file import YamlFileSpec
+    from ..env.installers.base import get_installer
 
     context.validate_configuration()
     check_non_admin()
@@ -279,8 +278,6 @@ def install(args, parser, command="install"):
     #  - set up environment variables
     post_install_actions = []
 
-    pip_specs = []
-    parsed_env_file = None
     # 1.b collect packages from files
     if args.file:
         for idx, fpath in enumerate(args.file):
@@ -293,12 +290,20 @@ def install(args, parser, command="install"):
                 log.warning("YAML support in 'conda {create,install,update,remove} --file' is experimental")
                 # get conda specs
                 specs.extend(parsed_env_file.environment.dependencies.get("conda", []))
-                pip_specs = parsed_env_file.environment.dependencies.get("pip")
 
+                # 2. collect post install actions for envs
                 # TODO: probably a better way to do this
                 def set_post_install_env_vars(prefix: str, *args, **kwargs) -> None:
                     pd = PrefixData(prefix)
                     pd.set_environment_env_vars(parsed_env_file.environment.variables)
+
+                def set_post_install_pip_install(prefix: str, args: Namespace) -> None:
+                    installer = get_installer("pip")
+                    installer.install_2(prefix, pip_specs, args)
+
+                pip_specs = parsed_env_file.environment.dependencies.get("pip")
+                if pip_specs is not None and len(pip_specs) > 0:
+                   post_install_actions.append(set_post_install_pip_install)
 
                 post_install_actions.append(set_post_install_env_vars)
             else:
@@ -454,9 +459,11 @@ def install(args, parser, command="install"):
                 if e.args and "could not import" in e.args[0]:
                     raise CondaImportError(str(e))
                 raise e
-    handle_txn(unlink_link_transaction, prefix, args, newenv, pip_specs=pip_specs)
+
+    handle_txn(unlink_link_transaction, prefix, args, newenv)
+
     for fn in post_install_actions:
-        fn(prefix, args)
+        fn(prefix=prefix, args=args)
 
 
 def revert_actions(prefix, revision=-1, index=None):
@@ -537,10 +544,7 @@ def install_revision(args: Namespace) -> None:
     handle_txn(unlink_link_transaction, prefix, args, newenv=False)
 
 
-def handle_txn(unlink_link_transaction, prefix, args, newenv, remove_op=False, pip_specs=[]):
-    from ..env.installers.base import get_installer
-    from ..env.env import print_result
-
+def handle_txn(unlink_link_transaction, prefix, args, newenv, remove_op=False):
     if unlink_link_transaction.nothing_to_do:
         if remove_op:
             # No packages found to remove from environment
@@ -574,10 +578,6 @@ def handle_txn(unlink_link_transaction, prefix, args, newenv, remove_op=False, p
 
     except SystemExit as e:
         raise CondaSystemExit("Exiting", e)
-    
-    if pip_specs is not None and len(pip_specs) > 0:
-        installer = get_installer("pip")
-        pip_install_result = installer.install_2(prefix, pip_specs, args)
 
     if newenv:
         touch_nonadmin(prefix)
