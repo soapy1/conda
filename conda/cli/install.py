@@ -293,18 +293,19 @@ def install(args, parser, command="install"):
 
     specs = []
     pip_specs = []
+    parsed_env_file = None
     if args.file:
         for idx, fpath in enumerate(args.file):
-            parsed = detect_input_file(name=Path(prefix).name, filename=fpath)
-            if isinstance(parsed, YamlFileSpec):
+            parsed_env_file = detect_input_file(name=Path(prefix).name, filename=fpath)
+            if isinstance(parsed_env_file, YamlFileSpec):
                 if idx != 0:
                     # We only allow a single --file to be a YAML file (for now)
                     raise CondaError("YAML files can only be passed as the single --file argument."
                 )
                 log.warning("YAML support in 'conda {create,install,update,remove} --file' is experimental")
                 # get conda specs
-                specs.extend(parsed.environment.dependencies["conda"])
-                pip_specs = parsed.environment.dependencies["pip"]
+                specs.extend(parsed_env_file.environment.dependencies.get("conda"))
+                pip_specs = parsed_env_file.environment.dependencies.get("pip")
             else:
                 try:
                     specs.extend(common.specs_from_url(fpath, json=context.json))
@@ -494,6 +495,9 @@ def install(args, parser, command="install"):
                     raise CondaImportError(str(e))
                 raise e
     handle_txn(unlink_link_transaction, prefix, args, newenv, pip_specs=pip_specs)
+    if parsed_env_file is not None and parsed_env_file.environment.variables:
+            pd = PrefixData(prefix)
+            pd.set_environment_env_vars(parsed_env_file.environment.variables)
 
 
 def revert_actions(prefix, revision=-1, index=None):
@@ -572,7 +576,7 @@ def handle_txn(unlink_link_transaction, prefix, args, newenv, remove_op=False, p
     except SystemExit as e:
         raise CondaSystemExit("Exiting", e)
     
-    if len(pip_specs) > 0:
+    if pip_specs is not None and len(pip_specs) > 0:
         installer = get_installer("pip")
         pip_install_result = installer.install_2(prefix, pip_specs, args)
 
