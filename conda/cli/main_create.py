@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 
 from ..auxlib.ish import dals
 from ..notices import notices
+from ..misc import touch_nonadmin
+
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser, Namespace, _SubParsersAction
@@ -98,7 +100,7 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
     from ..gateways.disk.delete import rm_rf
     from ..gateways.disk.test import is_conda_environment
     from ..reporters import confirm_yn
-    from .install import check_prefix, install
+    from .install import check_prefix, install, clone, common_index_args, print_activate
 
     if not args.name and not args.prefix:
         if context.dry_run:
@@ -190,5 +192,20 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
                 list(args.packages),
                 "did not expect any arguments for --clone",
             )
+
+    if args.clone:
+        prefix = context.target_prefix
+        index_args = common_index_args(args)
+        clone(
+            args.clone,
+            prefix,
+            json=context.json,
+            quiet=context.quiet,
+            index_args=index_args,
+        )
+        touch_nonadmin(prefix)
+        print_activate(args.name or prefix)
+        return
+
 
     return install(args, parser, "create")
