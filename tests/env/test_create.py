@@ -35,18 +35,28 @@ def get_env_vars(prefix):
 
     return env_vars
 
+create_and_env_create = pytest.mark.parametrize(
+    "command",
+    (
+        pytest.param(("create", "--yes"), id="create"),
+        pytest.param(("env", "create"), id="env-create"),
+    ),
+)
 
+
+@create_and_env_create
 @pytest.mark.integration
 def test_create_update(
     conda_cli: CondaCLIFixture,
     monkeypatch: MonkeyPatch,
     tmp_envs_dir: Path,
+    command: tuple[str],
 ):
     env_name = uuid4().hex[:8]
     prefix = tmp_envs_dir / env_name
 
     conda_cli(
-        *("env", "create"),
+        *command,
         *("--name", env_name),
         *("--file", support_file("example/environment_pinned.yml")),
     )
@@ -80,17 +90,19 @@ def test_create_update(
 
 
 @pytest.mark.skip(reason="Need to find an appropriate server to test this on.")
+@create_and_env_create
 @pytest.mark.integration
 def test_create_host_port(
     monkeypatch: MonkeyPatch,
     conda_cli: CondaCLIFixture,
     tmp_envs_dir: Path,
+    command: tuple[str],
 ):
     env_name = uuid4().hex[:8]
     prefix = tmp_envs_dir / env_name
 
     conda_cli(
-        *("env", "create"),
+        *command,
         *("--name", env_name),
         *("--file", support_file("example/environment_host_port.yml")),
     )
@@ -99,17 +111,19 @@ def test_create_host_port(
     assert package_is_installed(prefix, "flask=2.0.3")
 
 
+@create_and_env_create
 @pytest.mark.integration
 def test_create_advanced_pip(
     monkeypatch: MonkeyPatch,
     conda_cli: CondaCLIFixture,
     tmp_envs_dir: Path,
+    command: tuple[str],
 ):
     env_name = uuid4().hex[:8]
     prefix = tmp_envs_dir / env_name
 
     stdout, stderr, _ = conda_cli(
-        *("env", "create"),
+        *command,
         *("--name", env_name),
         *("--file", support_file("advanced-pip/environment.yml")),
     )
@@ -123,28 +137,32 @@ def test_create_advanced_pip(
     assert package_is_installed(prefix, "xmltodict=0.10.2")
 
 
+@create_and_env_create
 @pytest.mark.integration
 def test_create_empty_env(
     monkeypatch: MonkeyPatch,
     conda_cli: CondaCLIFixture,
     tmp_envs_dir: Path,
+    command: tuple[str],
 ):
     env_name = uuid4().hex[:8]
     prefix = tmp_envs_dir / env_name
 
     conda_cli(
-        *("env", "create"),
+        *command,
         *("--name", env_name),
         *("--file", support_file("empty_env.yml")),
     )
     assert prefix.exists()
 
 
+@create_and_env_create
 @pytest.mark.integration
 def test_create_env_default_packages(
     monkeypatch: MonkeyPatch,
     conda_cli: CondaCLIFixture,
     tmp_envs_dir: Path,
+    command: tuple[str],
 ):
     # use "cheap" packages with no dependencies
     monkeypatch.setenv("CONDA_CREATE_DEFAULT_PACKAGES", "favicon,zlib")
@@ -155,7 +173,7 @@ def test_create_env_default_packages(
     prefix = tmp_envs_dir / env_name
 
     conda_cli(
-        *("env", "create"),
+        *command,
         *("--name", env_name),
         *("--file", support_file("env_with_dependencies.yml")),
     )
