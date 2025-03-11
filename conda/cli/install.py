@@ -203,8 +203,16 @@ def common_index_args(args: Namespace) -> dict[str: any]:
         "use_local": args.use_local,  # --use-local
     }
 
+
 def install(args, parser, command="install"):
-    """Logic for `conda install`, `conda update`, and `conda create`."""
+    """Logic for `conda install`, `conda update`, and `conda create`.
+    
+    Steps:
+    1. collect all conda packages to install
+    3. collect all post install actions (includes collecting pip packages to install)
+    4. solve + install the environment
+    6. apply post install actions (includes installing pip packages)
+    """
     from ..env import specs as env_specs
     from ..env.env import get_filename
     from ..env.specs import detect as detect_input_file
@@ -222,7 +230,10 @@ def install(args, parser, command="install"):
     isupdate = bool(command == "update")
     isinstall = bool(command == "install")
     isremove = bool(command == "remove")
+
     prefix = context.target_prefix
+    context_channels = context.channels
+    index_args = common_index_args(args)
 
     if context.force_32bit and prefix == context.root_prefix:
         raise CondaValueError("cannot use CONDA_FORCE_32BIT=1 in base env")
@@ -231,17 +242,17 @@ def install(args, parser, command="install"):
     if not newenv:
         ensure_prefix_is_valid(prefix)
 
+    # 1.a collect all packages specified in the command line
     args_packages = [s.strip("\"'") for s in args.packages]
-    if newenv and not args.no_default_packages:
+    if hasattr(args, "no_default_packages") and not args.no_default_packages:
         # Override defaults if they are specified at the command line
         names = [MatchSpec(pkg).name for pkg in args_packages]
         for default_package in context.create_default_packages:
             if MatchSpec(default_package).name not in names:
                 args_packages.append(default_package)
 
-    context_channels = context.channels
-    index_args = common_index_args(args)
-
+    # short circuit evaluation of environment if all the specified packages
+    # are package files. These packages will get installed explicitly.
     num_cp = sum(is_package_file(s) for s in args_packages)
     if num_cp:
         if num_cp == len(args_packages):
@@ -255,11 +266,22 @@ def install(args, parser, command="install"):
                 "cannot mix specifications with conda package filenames"
             )
 
-    specs = []
+    # specs will be all the package specs from the 
+    #   1. command line arguments
+    #   2. provided files
+    # They will be passed into the solver to build out the list of packages
+    # that need to be installed.
+    specs = [] #common.specs_from_args(args_packages, json=context.json)
+    
+    # post_install_actions is a list of all the things that must happen after
+    # the environment has been solved + created. This may include things like:
+    #  - install pip packages
+    #  - set up environment variables
+    post_install_actions = []
+
     pip_specs = []
     parsed_env_file = None
-    # TODO: should be pulling in all the packges for install around the same time
-    # that means parsing any provided environment.yaml files and other provided files
+    # 1.b collect packages from files
     if args.file:
         for idx, fpath in enumerate(args.file):
             parsed_env_file = detect_input_file(name=Path(prefix).name, filename=fpath)
@@ -272,6 +294,13 @@ def install(args, parser, command="install"):
                 # get conda specs
                 specs.extend(parsed_env_file.environment.dependencies.get("conda", []))
                 pip_specs = parsed_env_file.environment.dependencies.get("pip")
+
+                # TODO: probably a better way to do this
+                def set_post_install_env_vars(prefix: str, *args, **kwargs) -> None:
+                    pd = PrefixData(prefix)
+                    pd.set_environment_env_vars(parsed_env_file.environment.variables)
+
+                post_install_actions.append(set_post_install_env_vars)
             else:
                 try:
                     specs.extend(common.specs_from_url(fpath, json=context.json))
@@ -286,6 +315,7 @@ def install(args, parser, command="install"):
                 touch_nonadmin(prefix)
                 print_activate(args.name or prefix)
             return
+
     specs.extend(common.specs_from_args(args_packages, json=context.json))
 
     # for 'conda update', make sure the requested specs actually exist in the prefix
@@ -425,9 +455,8 @@ def install(args, parser, command="install"):
                     raise CondaImportError(str(e))
                 raise e
     handle_txn(unlink_link_transaction, prefix, args, newenv, pip_specs=pip_specs)
-    if parsed_env_file is not None and parsed_env_file.environment.variables:
-            pd = PrefixData(prefix)
-            pd.set_environment_env_vars(parsed_env_file.environment.variables)
+    for fn in post_install_actions:
+        fn(prefix, args)
 
 
 def revert_actions(prefix, revision=-1, index=None):
