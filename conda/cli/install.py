@@ -270,7 +270,7 @@ def install(args, parser, command="install"):
     #   2. provided files
     # They will be passed into the solver to build out the list of packages
     # that need to be installed.
-    specs = [] #common.specs_from_args(args_packages, json=context.json)
+    specs = common.specs_from_args(args_packages, json=context.json)
     
     # post_install_actions is a list of all the things that must happen after
     # the environment has been solved + created. This may include things like:
@@ -282,6 +282,8 @@ def install(args, parser, command="install"):
     if args.file:
         for idx, fpath in enumerate(args.file):
             parsed_env_file = detect_input_file(name=Path(prefix).name, filename=fpath)
+            # TODO: if the file is a yaml file we need to respect things like the 
+            # channel, prefix, name, etc. defined in the file
             if isinstance(parsed_env_file, YamlFileSpec):
                 if idx != 0:
                     # We only allow a single --file to be a YAML file (for now)
@@ -321,8 +323,6 @@ def install(args, parser, command="install"):
                 print_activate(args.name or prefix)
             return
 
-    specs.extend(common.specs_from_args(args_packages, json=context.json))
-
     # for 'conda update', make sure the requested specs actually exist in the prefix
     # and that they are name-only specs
     if isupdate and context.update_modifier != UpdateModifier.UPDATE_ALL:
@@ -336,18 +336,6 @@ def install(args, parser, command="install"):
                 )
             if not prefix_data.get(spec.name, None):
                 raise PackageNotInstalledError(prefix, spec.name)
-
-    if newenv and args.clone:
-        clone(
-            args.clone,
-            prefix,
-            json=context.json,
-            quiet=context.quiet,
-            index_args=index_args,
-        )
-        touch_nonadmin(prefix)
-        print_activate(args.name or prefix)
-        return
 
     repodata_fns = args.repodata_fns
     if not repodata_fns:
