@@ -304,7 +304,7 @@ def install(args, parser, command="install"):
                 )
                 log.warning("YAML support in 'conda {create,install,update,remove} --file' is experimental")
                 # get conda specs
-                specs.extend(parsed_env_file.environment.dependencies.get("conda"))
+                specs.extend(parsed_env_file.environment.dependencies.get("conda", []))
                 pip_specs = parsed_env_file.environment.dependencies.get("pip")
             else:
                 try:

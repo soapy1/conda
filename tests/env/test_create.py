@@ -184,11 +184,13 @@ def test_create_env_default_packages(
     assert package_is_installed(prefix, "zlib")
 
 
+@create_and_env_create
 @pytest.mark.integration
 def test_create_env_no_default_packages(
     monkeypatch: MonkeyPatch,
     conda_cli: CondaCLIFixture,
     tmp_envs_dir: Path,
+    command: tuple[str],
 ):
     # use "cheap" packages with no dependencies
     monkeypatch.setenv("CONDA_CREATE_DEFAULT_PACKAGES", "favicon,zlib")
@@ -199,7 +201,7 @@ def test_create_env_no_default_packages(
     prefix = tmp_envs_dir / env_name
 
     conda_cli(
-        *("env", "create"),
+        *command,
         *("--name", env_name),
         *("--file", support_file("env_with_dependencies.yml")),
         "--no-default-packages",
@@ -211,18 +213,20 @@ def test_create_env_no_default_packages(
     assert not package_is_installed(prefix, "zlib")
 
 
+@create_and_env_create
 @pytest.mark.integration
 def test_create_update_remote_env_file(
     support_file_server_port,
     monkeypatch: MonkeyPatch,
     conda_cli: CondaCLIFixture,
     tmp_envs_dir: Path,
+    command: tuple[str],
 ):
     env_name = uuid4().hex[:8]
     prefix = tmp_envs_dir / env_name
 
     conda_cli(
-        *("env", "create"),
+        *command,
         *("--name", env_name),
         *(
             "--file",
@@ -284,6 +288,8 @@ def test_fail_to_create_env_in_dir_with_colon(
         conda_cli("create", f"--prefix={colon_dir}/tester")
 
 
+
+@create_and_env_create
 @pytest.mark.parametrize(
     "env_file",
     ["example/environment.yml", "example/environment_with_pip.yml"],
@@ -292,10 +298,11 @@ def test_create_env_json(
     env_file,
     conda_cli: CondaCLIFixture,
     path_factory: PathFactoryFixture,
+    command: tuple[str],
 ):
     prefix = path_factory()
     stdout, stderr, err = conda_cli(
-        *("env", "update"),
+        *command,
         *("--prefix", prefix),
         *("--file", support_file(env_file)),
         "--json",
@@ -305,14 +312,15 @@ def test_create_env_json(
         json.loads(string)
 
 
+
+@create_and_env_create
 def test_protected_dirs_error_for_env_create(
-    conda_cli: CondaCLIFixture, tmp_env: TmpEnvFixture
+    conda_cli: CondaCLIFixture, tmp_env: TmpEnvFixture, command: tuple[str],
 ):
     with tmp_env() as prefix:
         with pytest.raises(CondaEnvException) as error:
             conda_cli(
-                "env",
-                "create",
+                *(command),
                 f"--prefix={prefix}/envs",
                 "--file",
                 support_file("example/environment_pinned.yml"),
