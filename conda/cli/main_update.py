@@ -94,8 +94,8 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
 
     if not (
         args.file
-        or args.package
-        or context.update_modified == UpdateModifier.UPDATE_ALL
+        or args.packages
+        or context.update_modifier == UpdateModifier.UPDATE_ALL
     ):
         raise CondaValueError(
             """no package names supplied

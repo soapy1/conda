@@ -52,6 +52,7 @@ from ..exceptions import (
     UnsatisfiableError,
 )
 from ..gateways.disk.delete import delete_trash, path_is_clean
+from ..gateways.disk.test import is_conda_environment
 from ..history import History
 from ..misc import _get_best_prec_match, clone_env, explicit, touch_nonadmin
 from ..models.match_spec import MatchSpec
@@ -172,13 +173,28 @@ def get_revision(arg, json=False):
         raise CondaValueError(f"expected revision number, not: '{arg}'", json)
 
 
+def ensure_prefix_is_clean(prefix):
+    if isdir(prefix):
+        delete_trash(prefix)
+        if not is_conda_environment(prefix):
+            if paths_equal(prefix, context.conda_prefix):
+                raise NoBaseEnvironmentError()
+            else:
+                if not path_is_clean(prefix):
+                    raise DirectoryNotACondaEnvironmentError(prefix)
+        else:
+            # fall-through expected under normal operation
+            pass
+    else:
+        raise EnvironmentLocationNotFound(prefix)
+
+
 def install(args, parser, command="install"):
     """Logic for `conda install`, `conda update`, and `conda create`."""
     from ..env import specs as env_specs
     from ..env.env import get_filename
     from ..env.specs import detect as detect_input_file
     from ..env.specs.yaml_file import YamlFileSpec
-    from ..gateways.disk.test import is_conda_environment
 
     context.validate_configuration()
     check_non_admin()
@@ -197,20 +213,9 @@ def install(args, parser, command="install"):
     if context.force_32bit and prefix == context.root_prefix:
         raise CondaValueError("cannot use CONDA_FORCE_32BIT=1 in base env")
 
-    # TODO: not sure if this (not newenv) bit is needed?
-    if (not newenv) and isdir(prefix):
-        delete_trash(prefix)
-        if not is_conda_environment(prefix):
-            if paths_equal(prefix, context.conda_prefix):
-                raise NoBaseEnvironmentError()
-            else:
-                if not path_is_clean(prefix):
-                    raise DirectoryNotACondaEnvironmentError(prefix)
-        else:
-            # fall-through expected under normal operation
-            pass
-    else:
-        raise EnvironmentLocationNotFound(prefix)
+    # TODO: would like to move this, not sure?
+    if not newenv:
+        ensure_prefix_is_clean(prefix)
 
     args_packages = [s.strip("\"'") for s in args.packages]
     if newenv and not args.no_default_packages:
