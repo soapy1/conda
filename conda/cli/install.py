@@ -14,6 +14,7 @@ import os
 from logging import getLogger
 from os.path import abspath, basename, exists, isdir, isfile, join
 from pathlib import Path
+from argparse import Namespace
 
 from boltons.setutils import IndexedSet
 
@@ -173,7 +174,7 @@ def get_revision(arg, json=False):
         raise CondaValueError(f"expected revision number, not: '{arg}'", json)
 
 
-def ensure_prefix_is_clean(prefix):
+def ensure_prefix_is_valid(prefix):
     if isdir(prefix):
         delete_trash(prefix)
         if not is_conda_environment(prefix):
@@ -188,6 +189,19 @@ def ensure_prefix_is_clean(prefix):
     else:
         raise EnvironmentLocationNotFound(prefix)
 
+
+def common_index_args(args: Namespace) -> dict[str: any]:
+    """Returns a common set of common arguments for fetching a channel index."""
+    context_channels = context.channels
+    return {
+        # TODO: deprecate --use-index-cache
+        # "use_cache": args.use_index_cache,  # --use-index-cache
+        "channel_urls": context_channels,
+        # TODO: deprecate --unknown
+        # "unknown": args.unknown,  # --unknown
+        "prepend": not args.override_channels,  # --override-channels
+        "use_local": args.use_local,  # --use-local
+    }
 
 def install(args, parser, command="install"):
     """Logic for `conda install`, `conda update`, and `conda create`."""
@@ -215,7 +229,7 @@ def install(args, parser, command="install"):
 
     # TODO: would like to move this, not sure?
     if not newenv:
-        ensure_prefix_is_clean(prefix)
+        ensure_prefix_is_valid(prefix)
 
     args_packages = [s.strip("\"'") for s in args.packages]
     if newenv and not args.no_default_packages:
@@ -226,15 +240,7 @@ def install(args, parser, command="install"):
                 args_packages.append(default_package)
 
     context_channels = context.channels
-    index_args = {
-        # TODO: deprecate --use-index-cache
-        # "use_cache": args.use_index_cache,  # --use-index-cache
-        "channel_urls": context_channels,
-        # TODO: deprecate --unknown
-        # "unknown": args.unknown,  # --unknown
-        "prepend": not args.override_channels,  # --override-channels
-        "use_local": args.use_local,  # --use-local
-    }
+    index_args = common_index_args(args)
 
     num_cp = sum(is_package_file(s) for s in args_packages)
     if num_cp:
@@ -327,52 +333,31 @@ def install(args, parser, command="install"):
 
     for repodata_fn in repodata_fns:
         try:
-            if isinstall and args.revision:
-                with get_spinner(f"Collecting package metadata ({repodata_fn})"):
-                    index = get_index(
-                        channel_urls=index_args["channel_urls"],
-                        prepend=index_args["prepend"],  # --override-channels
-                        platform=None,
-                        use_local=index_args["use_local"],  # --use-local
-                        # use_cache=index_args["use_cache"],  # --use-index-cache
-                        # unknown=index_args["unknown"],  # --unknown
-                        prefix=prefix,
-                        repodata_fn=repodata_fn,
-                    )
-                revision_idx = get_revision(args.revision)
-                with get_spinner(f"Reverting to revision {revision_idx}"):
-                    unlink_link_transaction = revert_actions(
-                        prefix, revision_idx, index
-                    )
-            else:
-                solver_backend = context.plugin_manager.get_cached_solver_backend()
-                solver = solver_backend(
-                    prefix,
-                    context_channels,
-                    context.subdirs,
-                    specs_to_add=specs,
-                    repodata_fn=repodata_fn,
-                    command=args.cmd,
-                )
-                update_modifier = context.update_modifier
-                if (isinstall or isremove) and args.update_modifier == NULL:
-                    update_modifier = UpdateModifier.FREEZE_INSTALLED
-                deps_modifier = context.deps_modifier
-                if isupdate:
-                    deps_modifier = context.deps_modifier or DepsModifier.UPDATE_SPECS
+            solver_backend = context.plugin_manager.get_cached_solver_backend()
+            solver = solver_backend(
+                prefix,
+                context_channels,
+                context.subdirs,
+                specs_to_add=specs,
+                repodata_fn=repodata_fn,
+                command=args.cmd,
+            )
+            update_modifier = context.update_modifier
+            if (isinstall or isremove) and args.update_modifier == NULL:
+                update_modifier = UpdateModifier.FREEZE_INSTALLED
+            deps_modifier = context.deps_modifier
+            if isupdate:
+                deps_modifier = context.deps_modifier or DepsModifier.UPDATE_SPECS
 
-                unlink_link_transaction = solver.solve_for_transaction(
-                    deps_modifier=deps_modifier,
-                    update_modifier=update_modifier,
-                    force_reinstall=context.force_reinstall or context.force,
-                    should_retry_solve=(
-                        _should_retry_unfrozen or repodata_fn != repodata_fns[-1]
-                    ),
-                )
-            # we only need one of these to work.  If we haven't raised an exception,
-            #   we're good.
+            unlink_link_transaction = solver.solve_for_transaction(
+                deps_modifier=deps_modifier,
+                update_modifier=update_modifier,
+                force_reinstall=context.force_reinstall or context.force,
+                should_retry_solve=(
+                    _should_retry_unfrozen or repodata_fn != repodata_fns[-1]
+                ),
+            )
             break
-
         except (ResolvePackageNotFound, PackagesNotFoundError) as e:
             if not getattr(e, "allow_retry", True):
                 raise e  # see note in next except block
@@ -481,6 +466,46 @@ def revert_actions(prefix, revision=-1, index=None):
     unlink_precs, link_precs = diff_for_unlink_link_precs(prefix, final_precs)
     setup = PrefixSetup(prefix, unlink_precs, link_precs, (), user_requested_specs, ())
     return UnlinkLinkTransaction(setup)
+
+
+def install_revision(args: Namespace) -> None:
+    """Installs a revision of a conda environment."""
+    # TODO: all common stuff with `install` function
+    context.validate_configuration()
+    check_non_admin()
+    ensure_prefix_is_valid(prefix)
+    # this is sort of a hack.  current_repodata.json may not have any .tar.bz2 files,
+    #    because it deduplicates records that exist as both formats.  Forcing this to
+    #    repodata.json ensures that .tar.bz2 files are available
+    if context.use_only_tar_bz2:
+        args.repodata_fns = ("repodata.json",)
+    prefix = context.target_prefix
+    index_args = common_index_args(args)
+    repodata_fns = args.repodata_fns
+    if not repodata_fns:
+        repodata_fns = list(context.repodata_fns)
+    if REPODATA_FN not in repodata_fns:
+        repodata_fns.append(REPODATA_FN)
+
+    for repodata_fn in repodata_fns:
+        with get_spinner(f"Collecting package metadata ({repodata_fn})"):
+            index = get_index(
+                channel_urls=index_args["channel_urls"],
+                prepend=index_args["prepend"],  # --override-channels
+                platform=None,
+                use_local=index_args["use_local"],  # --use-local
+                # use_cache=index_args["use_cache"],  # --use-index-cache
+                # unknown=index_args["unknown"],  # --unknown
+                prefix=prefix,
+                repodata_fn=repodata_fn,
+            )
+        revision_idx = get_revision(args.revision)
+        with get_spinner(f"Reverting to revision {revision_idx}"):
+            unlink_link_transaction = revert_actions(
+                prefix, revision_idx, index
+            )
+
+    handle_txn(unlink_link_transaction, prefix, args, newenv=False)
 
 
 def handle_txn(unlink_link_transaction, prefix, args, newenv, remove_op=False, pip_specs=[]):
