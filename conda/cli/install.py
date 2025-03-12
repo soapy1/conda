@@ -512,22 +512,30 @@ def install_revision(args: Namespace) -> None:
         repodata_fns.append(REPODATA_FN)
 
     for repodata_fn in repodata_fns:
-        with get_spinner(f"Collecting package metadata ({repodata_fn})"):
-            index = get_index(
-                channel_urls=index_args["channel_urls"],
-                prepend=index_args["prepend"],  # --override-channels
-                platform=None,
-                use_local=index_args["use_local"],  # --use-local
-                # use_cache=index_args["use_cache"],  # --use-index-cache
-                # unknown=index_args["unknown"],  # --unknown
-                prefix=prefix,
-                repodata_fn=repodata_fn,
-            )
-        revision_idx = get_revision(args.revision)
-        with get_spinner(f"Reverting to revision {revision_idx}"):
-            unlink_link_transaction = revert_actions(
-                prefix, revision_idx, index
-            )
+        try:
+            with get_spinner(f"Collecting package metadata ({repodata_fn})"):
+                index = get_index(
+                    channel_urls=index_args["channel_urls"],
+                    prepend=index_args["prepend"],  # --override-channels
+                    platform=None,
+                    use_local=index_args["use_local"],  # --use-local
+                    # use_cache=index_args["use_cache"],  # --use-index-cache
+                    # unknown=index_args["unknown"],  # --unknown
+                    prefix=prefix,
+                    repodata_fn=repodata_fn,
+                )
+            revision_idx = get_revision(args.revision)
+            with get_spinner(f"Reverting to revision {revision_idx}"):
+                unlink_link_transaction = revert_actions(
+                    prefix, revision_idx, index
+                )
+            break
+        except PackagesNotFoundError as e:
+            if not getattr(e, "allow_retry", True):
+                raise e  
+            # end of the line.  Raise the exception
+            if repodata_fn == repodata_fns[-1]:
+                raise e 
 
     handle_txn(unlink_link_transaction, prefix, args, newenv=False)
 
