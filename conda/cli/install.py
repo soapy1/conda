@@ -241,7 +241,7 @@ def install(args, parser, command="install"):
     if not newenv:
         ensure_prefix_is_valid(prefix)
 
-    # 1.a collect all packages specified in the command line
+    # 1.a collect all packages specified in the command line + default packages
     args_packages = [s.strip("\"'") for s in args.packages]
     if hasattr(args, "no_default_packages") and not args.no_default_packages:
         # Override defaults if they are specified at the command line
@@ -266,8 +266,8 @@ def install(args, parser, command="install"):
             )
 
     # specs will be all the package specs from the 
-    #   1. command line arguments
-    #   2. provided files
+    #   - command line arguments
+    #   - provided files
     # They will be passed into the solver to build out the list of packages
     # that need to be installed.
     specs = common.specs_from_args(args_packages, json=context.json)
@@ -282,16 +282,18 @@ def install(args, parser, command="install"):
     if args.file:
         for idx, fpath in enumerate(args.file):
             parsed_env_file = detect_input_file(name=Path(prefix).name, filename=fpath)
-            # TODO: if the file is a yaml file we need to respect things like the 
-            # channel, prefix, name, etc. defined in the file
             if isinstance(parsed_env_file, YamlFileSpec):
                 if idx != 0:
                     # We only allow a single --file to be a YAML file (for now)
                     raise CondaError("YAML files can only be passed as the single --file argument."
                 )
                 log.warning("YAML support in 'conda {create,install,update,remove} --file' is experimental")
-                # get conda specs
+
+                # add conda specs to the list of specs to add
                 specs.extend(parsed_env_file.environment.dependencies.get("conda", []))
+
+                # overwrite the configured channels with the ones from the environment yaml
+                context_channels = tuple(parsed_env_file.environment.channels)
 
                 # 2. collect post install actions for envs
                 # TODO: probably a better way to do this
