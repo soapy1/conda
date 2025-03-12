@@ -16,6 +16,7 @@ from ..exceptions import (
     CondaError,
     DirectoryNotACondaEnvironmentError,
     EnvironmentLocationNotFound,
+    NoBaseEnvironmentError,
 )
 from ..models.match_spec import MatchSpec
 from ..reporters import render
@@ -262,4 +263,20 @@ def validate_prefix(prefix):
     else:
         raise EnvironmentLocationNotFound(prefix)
 
+    return prefix
+
+
+def ensure_base_environment_exists(prefix: str) -> str:
+    """Ensures that there is a valid base environment.
+
+    :raises NoBaseEnvironmentError: Base environment does not exist.
+    :returns: Valid prefix.
+    """
+    if (
+        isdir(prefix) 
+        and (not isfile(join(prefix, "conda-meta", "history"))) 
+        and paths_equal(prefix, context.conda_prefix)
+    ):
+        raise NoBaseEnvironmentError()
+    
     return prefix

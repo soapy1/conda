@@ -174,22 +174,6 @@ def get_revision(arg, json=False):
         raise CondaValueError(f"expected revision number, not: '{arg}'", json)
 
 
-def ensure_prefix_is_valid(prefix):
-    if isdir(prefix):
-        delete_trash(prefix)
-        if not is_conda_environment(prefix):
-            if paths_equal(prefix, context.conda_prefix):
-                raise NoBaseEnvironmentError()
-            else:
-                if not path_is_clean(prefix):
-                    raise DirectoryNotACondaEnvironmentError(prefix)
-        else:
-            # fall-through expected under normal operation
-            pass
-    else:
-        raise EnvironmentLocationNotFound(prefix)
-
-
 def common_index_args(args: Namespace) -> dict[str: any]:
     """Returns a common set of common arguments for fetching a channel index."""
     context_channels = context.channels
@@ -218,7 +202,6 @@ def install(args, parser, command="install"):
     from ..env.installers.base import get_installer
 
     context.validate_configuration()
-    check_non_admin()
     # this is sort of a hack.  current_repodata.json may not have any .tar.bz2 files,
     #    because it deduplicates records that exist as both formats.  Forcing this to
     #    repodata.json ensures that .tar.bz2 files are available
@@ -237,9 +220,9 @@ def install(args, parser, command="install"):
     if context.force_32bit and prefix == context.root_prefix:
         raise CondaValueError("cannot use CONDA_FORCE_32BIT=1 in base env")
 
-    # TODO: would like to move this, not sure?
-    if not newenv:
-        ensure_prefix_is_valid(prefix)
+    # clean up prefix before installing
+    if isdir(prefix):
+        delete_trash(prefix)
 
     # 1.a collect all packages specified in the command line + default packages
     args_packages = [s.strip("\"'") for s in args.packages]
@@ -498,8 +481,6 @@ def install_revision(args: Namespace) -> None:
     """Installs a revision of a conda environment."""
     # TODO: all common stuff with `install` function
     context.validate_configuration()
-    check_non_admin()
-    ensure_prefix_is_valid(prefix)
     # this is sort of a hack.  current_repodata.json may not have any .tar.bz2 files,
     #    because it deduplicates records that exist as both formats.  Forcing this to
     #    repodata.json ensures that .tar.bz2 files are available

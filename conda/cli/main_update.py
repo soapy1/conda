@@ -90,6 +90,7 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
     from ..base.context import context
     from ..base.constants import UpdateModifier
     from .install import install
+    from .common import validate_prefix, ensure_base_environment_exists, check_non_admin
     from ..exceptions import CondaValueError
 
     if not (
@@ -112,6 +113,11 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
             "\n",
             file=sys.stderr,
         )
+
+    # do validations
+    validate_prefix(context.target_prefix)
+    ensure_base_environment_exists(context.target_prefix)
+    check_non_admin()
 
     install(args, parser, "update")
     return 0

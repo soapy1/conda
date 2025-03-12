@@ -101,6 +101,8 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
     from ..gateways.disk.test import is_conda_environment
     from ..reporters import confirm_yn
     from .install import check_prefix, install, clone, common_index_args, print_activate
+    from .common import check_non_admin
+
 
     if not args.name and not args.prefix:
         if context.dry_run:
@@ -113,8 +115,9 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
                 "one of the arguments -n/--name -p/--prefix is required"
             )
 
+    # do validations
+    check_non_admin()
     check_protected_dirs(context.target_prefix)
-    check_prefix(context.target_prefix, json=context.json)
 
     if is_conda_environment(context.target_prefix):
         if paths_equal(context.target_prefix, context.root_prefix):

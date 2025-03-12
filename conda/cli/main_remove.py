@@ -154,7 +154,7 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
     from ..gateways.disk.delete import path_is_clean, rm_rf
     from ..gateways.disk.test import is_conda_environment
     from ..models.match_spec import MatchSpec
-    from .common import check_non_admin, specs_from_args
+    from .common import check_non_admin, specs_from_args, validate_prefix, ensure_base_environment_exists
     from .install import handle_txn
 
     if not (args.all or args.package_names):
@@ -162,11 +162,11 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
             'no package names supplied,\n       try "conda remove -h" for more details'
         )
 
+    # do validations
     prefix = context.target_prefix
     check_non_admin()
-
-    if not is_conda_environment(prefix):
-        raise EnvironmentLocationNotFound(prefix)
+    validate_prefix(prefix)
+    ensure_base_environment_exists(prefix)
 
     if args.all and prefix == context.default_prefix:
         msg = "Cannot remove current environment. Deactivate and run conda remove again"
