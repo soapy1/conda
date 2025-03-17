@@ -35,18 +35,28 @@ def get_env_vars(prefix):
 
     return env_vars
 
+create_and_env_create = pytest.mark.parametrize(
+    "command",
+    (
+        pytest.param(("create", "--yes"), id="create"),
+        pytest.param(("env", "create"), id="env-create"),
+    ),
+)
 
+
+@create_and_env_create
 @pytest.mark.integration
 def test_create_update(
     conda_cli: CondaCLIFixture,
     monkeypatch: MonkeyPatch,
     tmp_envs_dir: Path,
+    command: tuple[str],
 ):
     env_name = uuid4().hex[:8]
     prefix = tmp_envs_dir / env_name
 
     conda_cli(
-        *("env", "create"),
+        *command,
         *("--name", env_name),
         *("--file", support_file("example/environment_pinned.yml")),
     )
@@ -80,17 +90,19 @@ def test_create_update(
 
 
 @pytest.mark.skip(reason="Need to find an appropriate server to test this on.")
+@create_and_env_create
 @pytest.mark.integration
 def test_create_host_port(
     monkeypatch: MonkeyPatch,
     conda_cli: CondaCLIFixture,
     tmp_envs_dir: Path,
+    command: tuple[str],
 ):
     env_name = uuid4().hex[:8]
     prefix = tmp_envs_dir / env_name
 
     conda_cli(
-        *("env", "create"),
+        *command,
         *("--name", env_name),
         *("--file", support_file("example/environment_host_port.yml")),
     )
@@ -99,17 +111,19 @@ def test_create_host_port(
     assert package_is_installed(prefix, "flask=2.0.3")
 
 
+@create_and_env_create
 @pytest.mark.integration
 def test_create_advanced_pip(
     monkeypatch: MonkeyPatch,
     conda_cli: CondaCLIFixture,
     tmp_envs_dir: Path,
+    command: tuple[str],
 ):
     env_name = uuid4().hex[:8]
     prefix = tmp_envs_dir / env_name
 
     stdout, stderr, _ = conda_cli(
-        *("env", "create"),
+        *command,
         *("--name", env_name),
         *("--file", support_file("advanced-pip/environment.yml")),
     )
@@ -123,28 +137,32 @@ def test_create_advanced_pip(
     assert package_is_installed(prefix, "xmltodict=0.10.2")
 
 
+@create_and_env_create
 @pytest.mark.integration
 def test_create_empty_env(
     monkeypatch: MonkeyPatch,
     conda_cli: CondaCLIFixture,
     tmp_envs_dir: Path,
+    command: tuple[str],
 ):
     env_name = uuid4().hex[:8]
     prefix = tmp_envs_dir / env_name
 
     conda_cli(
-        *("env", "create"),
+        *command,
         *("--name", env_name),
         *("--file", support_file("empty_env.yml")),
     )
     assert prefix.exists()
 
 
+@create_and_env_create
 @pytest.mark.integration
 def test_create_env_default_packages(
     monkeypatch: MonkeyPatch,
     conda_cli: CondaCLIFixture,
     tmp_envs_dir: Path,
+    command: tuple[str],
 ):
     # use "cheap" packages with no dependencies
     monkeypatch.setenv("CONDA_CREATE_DEFAULT_PACKAGES", "favicon,zlib")
@@ -155,7 +173,7 @@ def test_create_env_default_packages(
     prefix = tmp_envs_dir / env_name
 
     conda_cli(
-        *("env", "create"),
+        *command,
         *("--name", env_name),
         *("--file", support_file("env_with_dependencies.yml")),
     )
@@ -166,11 +184,13 @@ def test_create_env_default_packages(
     assert package_is_installed(prefix, "zlib")
 
 
+@create_and_env_create
 @pytest.mark.integration
 def test_create_env_no_default_packages(
     monkeypatch: MonkeyPatch,
     conda_cli: CondaCLIFixture,
     tmp_envs_dir: Path,
+    command: tuple[str],
 ):
     # use "cheap" packages with no dependencies
     monkeypatch.setenv("CONDA_CREATE_DEFAULT_PACKAGES", "favicon,zlib")
@@ -181,7 +201,7 @@ def test_create_env_no_default_packages(
     prefix = tmp_envs_dir / env_name
 
     conda_cli(
-        *("env", "create"),
+        *command,
         *("--name", env_name),
         *("--file", support_file("env_with_dependencies.yml")),
         "--no-default-packages",
@@ -193,18 +213,20 @@ def test_create_env_no_default_packages(
     assert not package_is_installed(prefix, "zlib")
 
 
+@create_and_env_create
 @pytest.mark.integration
 def test_create_update_remote_env_file(
     support_file_server_port,
     monkeypatch: MonkeyPatch,
     conda_cli: CondaCLIFixture,
     tmp_envs_dir: Path,
+    command: tuple[str],
 ):
     env_name = uuid4().hex[:8]
     prefix = tmp_envs_dir / env_name
 
     conda_cli(
-        *("env", "create"),
+        *command,
         *("--name", env_name),
         *(
             "--file",
@@ -251,9 +273,10 @@ def test_create_update_remote_env_file(
     assert env_vars["GETS_DELETED"] == "not_actually_removed_though"
 
 
+@create_and_env_create
 @pytest.mark.skipif(on_win, reason="Test is invalid on Windows")
 def test_fail_to_create_env_in_dir_with_colon(
-    tmp_path: Path, conda_cli: CondaCLIFixture
+    tmp_path: Path, conda_cli: CondaCLIFixture, command: tuple[str],
 ):
     # Add a directory with a colon
     colon_dir = tmp_path / "fake:dir"
@@ -263,9 +286,10 @@ def test_fail_to_create_env_in_dir_with_colon(
         CondaValueError,
         match="Cannot create a conda environment with ':' in the prefix.",
     ):
-        conda_cli("create", f"--prefix={colon_dir}/tester")
+        conda_cli(*command, f"--prefix={colon_dir}/tester")
 
 
+@create_and_env_create
 @pytest.mark.parametrize(
     "env_file",
     ["example/environment.yml", "example/environment_with_pip.yml"],
@@ -274,10 +298,11 @@ def test_create_env_json(
     env_file,
     conda_cli: CondaCLIFixture,
     path_factory: PathFactoryFixture,
+    command: tuple[str],
 ):
     prefix = path_factory()
     stdout, stderr, err = conda_cli(
-        *("env", "update"),
+        *command,
         *("--prefix", prefix),
         *("--file", support_file(env_file)),
         "--json",
@@ -287,14 +312,15 @@ def test_create_env_json(
         json.loads(string)
 
 
+@create_and_env_create
 def test_protected_dirs_error_for_env_create(
-    conda_cli: CondaCLIFixture, tmp_env: TmpEnvFixture
+    conda_cli: CondaCLIFixture, tmp_env: TmpEnvFixture, command: tuple[str],
+
 ):
     with tmp_env() as prefix:
         with pytest.raises(CondaEnvException) as error:
             conda_cli(
-                "env",
-                "create",
+                *(command),
                 f"--prefix={prefix}/envs",
                 "--file",
                 support_file("example/environment_pinned.yml"),
