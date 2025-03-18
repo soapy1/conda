@@ -23,6 +23,7 @@ if TYPE_CHECKING:
     from contextlib import AbstractContextManager
     from typing import Any, Callable, Iterable, Protocol
 
+    from ..base.context import Context
     from ..common.configuration import Parameter
     from ..core.solve import Solver
     from ..env.env import Environment
@@ -33,6 +34,7 @@ if TYPE_CHECKING:
             self,
             prefix: str,
             specs: Iterable[str],
+            context: Context,
             *_,
             **kwargs,
         ) -> Iterable[str]: ...
@@ -41,6 +43,7 @@ if TYPE_CHECKING:
         def __call__(
             self,
             specs: Iterable[str],
+            context: Context,
             *_,
             **kwargs,
         ) -> Environment: ...
