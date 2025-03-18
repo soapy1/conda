@@ -1,21 +1,14 @@
 # Copyright (C) 2012 Anaconda, Inc
 # SPDX-License-Identifier: BSD-3-Clause
-"""Dynamic installer loading."""
+"""DEPRECATED: Use `conda.installers.base` instead.
 
-from ...deprecations import deprecated
+Dynamic installer loading.
+"""
 
+from conda.deprecations import deprecated
+from conda.installers.base import get_installer  # noqa
+from conda.exceptions import InvalidInstaller  # noqa
 
-@deprecated(
-    "24.7",
-    "25.1",
-    addendum="Use `conda.base.context.context.plugin_manager.get_env_installer` instead.",
-)
-def get_installer(name):
-    """
-    Gets the installer for the given environment.
+deprecated.module("24.9", "25.3", addendum="Use `conda.installers.base` instead.")
 
-    Raises: InvalidInstaller if unable to load installer
-    """
-    from conda.base.context import context
-
-    return context.plugin_manager.get_env_installer(name)
+ENTRY_POINT = "conda.env.installers"
