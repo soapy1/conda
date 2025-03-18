@@ -11,4 +11,4 @@ from conda.exceptions import InvalidInstaller  # noqa
 
 deprecated.module("24.9", "25.3", addendum="Use `conda.installers.base` instead.")
 
-ENTRY_POINT = "conda.env.installers"
+ENTRY_POINT = "conda_env.installers"

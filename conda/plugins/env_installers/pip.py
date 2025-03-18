@@ -7,7 +7,7 @@ from .. import CondaEnvInstaller, hookimpl
 
 @hookimpl
 def conda_env_installers():
-    from ...env.installers.pip import dry_run, install
+    from ...installers.pip import dry_run, install
 
     yield CondaEnvInstaller(
         name="pip",
