@@ -62,7 +62,7 @@ def dry_run(*args, **kwargs):
     return None
 
 
-def install(prefix, specs, *args, **kwargs):
+def install(prefix, specs, context, *args, **kwargs):
     with Spinner(
         "Installing pip dependencies",
         not context.verbose and not context.quiet,
