@@ -13,6 +13,7 @@ from __future__ import annotations
 import os
 from functools import wraps
 from logging import getLogger
+from argparse import Namespace
 from os.path import abspath, basename, exists, isdir, isfile, join
 from pathlib import Path
 
@@ -313,7 +314,18 @@ def ensure_update_specs_exist(prefix: str, specs: list[str]):
 
 
 def install(args, parser, command="install"):
-    """Logic for `conda install`, `conda update`, and `conda create`."""
+    """Logic for `conda install`, `conda update`, and `conda create`.
+
+    Steps:
+    1. collect all conda packages to install
+    3. collect all post install actions (includes collecting pip packages to install)
+    4. solve + install the environment
+    6. apply post install actions (includes installing pip packages)
+    """
+    from ..env.specs import detect as detect_input_file
+    from ..env.specs.yaml_file import YamlFileSpec
+    from ..env.installers.base import get_installer
+
     prefix = context.target_prefix
     newenv = bool(command == "create")
     isupdate = bool(command == "update")
@@ -333,9 +345,9 @@ def install(args, parser, command="install"):
     if isdir(prefix):
         delete_trash(prefix)
 
-    # collect packages provided from the command line
+    # 1.a collect all packages specified in the command line + default packages
     args_packages = [s.strip("\"'") for s in args.packages]
-    if newenv and not args.no_default_packages:
+    if hasattr(args, "no_default_packages") and not args.no_default_packages:
         # Override defaults if they are specified at the command line
         names = [MatchSpec(pkg).name for pkg in args_packages]
         for default_package in context.create_default_packages:
@@ -355,27 +367,69 @@ def install(args, parser, command="install"):
                 "cannot mix specifications with conda package filenames"
             )
 
-    # collect specs provided by --file arguments
-    specs = []
+    # specs will be all the package specs from the 
+    #   - command line arguments
+    #   - provided files
+    # They will be passed into the solver to build out the list of packages
+    # that need to be installed.
+    specs = common.specs_from_args(args_packages, json=context.json)
+
+    # post_install_actions is a list of all the things that must happen after
+    # the environment has been solved + created. This may include things like:
+    #  - install pip packages
+    #  - set up environment variables
+    post_install_actions = []
+
+    context_channels = context.channels
+    index_args = get_index_args(args=args)
+
+    # 1.b collect packages from files
     if args.file:
-        for fpath in args.file:
-            try:
-                specs.extend(common.specs_from_url(fpath, json=context.json))
-            except UnicodeError:
-                raise CondaError(
-                    "Error reading file, file should be a text file containing"
-                    " packages \nconda create --help for details"
+        for idx, fpath in enumerate(args.file):
+            parsed_env_file = detect_input_file(name=Path(prefix).name, filename=fpath)
+            if isinstance(parsed_env_file, YamlFileSpec):
+                if idx != 0:
+                    # We only allow a single --file to be a YAML file (for now)
+                    raise CondaError("YAML files can only be passed as the single --file argument."
                 )
+                log.warning("YAML support in 'conda {create,install,update,remove} --file' is experimental")
+
+                # add conda specs to the list of specs to add
+                specs.extend(parsed_env_file.environment.dependencies.get("conda", []))
+
+                # overwrite the configured channels with the ones from the environment yaml
+                context_channels = tuple(parsed_env_file.environment.channels)
+                index_args["channel_urls"] = context_channels
+
+                # 2. collect post install actions for envs
+                # TODO: probably a better way to do this
+                def set_post_install_env_vars(prefix: str, *args, **kwargs) -> None:
+                    pd = PrefixData(prefix)
+                    pd.set_environment_env_vars(parsed_env_file.environment.variables)
+
+                def set_post_install_pip_install(prefix: str, args: Namespace) -> None:
+                    installer = get_installer("pip")
+                    installer.install_2(prefix, pip_specs, args)
+
+                pip_specs = parsed_env_file.environment.dependencies.get("pip")
+                if pip_specs is not None and len(pip_specs) > 0:
+                   post_install_actions.append(set_post_install_pip_install)
+
+                post_install_actions.append(set_post_install_env_vars)
+            else:
+                try:
+                    specs.extend(common.specs_from_url(fpath, json=context.json))
+                except UnicodeError:
+                    raise CondaError(
+                        "Error reading file, file should be a text file containing"
+                        " packages \nconda create --help for details"
+                    )
         if "@EXPLICIT" in specs:
             # short circuit to installing explicit if explicit specs are provided
             explicit(specs, prefix, verbose=not context.quiet)
             if newenv:
                 print_activate(args.name or prefix)
             return
-    specs.extend(common.specs_from_args(args_packages, json=context.json))
-
-    index_args = get_index_args(args=args)
-    context_channels = context.channels
 
     # for 'conda update', make sure the requested specs actually exist in the prefix
     # and that they are name-only specs
@@ -476,6 +530,8 @@ def install(args, parser, command="install"):
 
     unlink_link_transaction = get_solve_transaction()
     handle_txn(unlink_link_transaction, prefix, args, newenv)
+    for fn in post_install_actions:
+        fn(prefix=prefix, args=args)
 
 
 def install_revision(args, parser):

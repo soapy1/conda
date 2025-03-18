@@ -273,10 +273,9 @@ def test_create_update_remote_env_file(
     assert env_vars["GETS_DELETED"] == "not_actually_removed_though"
 
 
-@create_and_env_create
 @pytest.mark.skipif(on_win, reason="Test is invalid on Windows")
 def test_fail_to_create_env_in_dir_with_colon(
-    tmp_path: Path, conda_cli: CondaCLIFixture, command: tuple[str],
+    tmp_path: Path, conda_cli: CondaCLIFixture
 ):
     # Add a directory with a colon
     colon_dir = tmp_path / "fake:dir"
@@ -286,7 +285,7 @@ def test_fail_to_create_env_in_dir_with_colon(
         CondaValueError,
         match="Cannot create a conda environment with ':' in the prefix.",
     ):
-        conda_cli(*command, f"--prefix={colon_dir}/tester")
+        conda_cli("create", f"--prefix={colon_dir}/tester")
 
 
 @create_and_env_create
