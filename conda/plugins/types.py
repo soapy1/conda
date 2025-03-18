@@ -29,8 +29,6 @@ if TYPE_CHECKING:
             self,
             prefix: str,
             specs: Iterable[str],
-            args: Namespace,
-            env: Environment,
             *_,
             **kwargs,
         ) -> Iterable[str]: ...
@@ -39,8 +37,6 @@ if TYPE_CHECKING:
         def __call__(
             self,
             specs: Iterable[str],
-            args: Namespace,
-            env: Environment,
             *_,
             **kwargs,
         ) -> Environment: ...
