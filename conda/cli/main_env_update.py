@@ -146,9 +146,7 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
                     Unable to install package for {installer_type}.
 
                     Please double check and ensure your dependencies file has
-                    the correct spelling. You might also try installing the
-                    corresponding conda plugin for this type (e.g. conda-pypi
-                    for 'pip').
+                    the correct spelling.
                     """
                 )
             )

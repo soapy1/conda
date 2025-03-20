@@ -345,138 +345,22 @@ def install(args, parser, command="install"):
         print_activate(args.name or prefix)
         return
 
-    repodata_fns = args.repodata_fns
-    if not repodata_fns:
-        repodata_fns = list(context.repodata_fns)
-    if REPODATA_FN not in repodata_fns:
-        repodata_fns.append(REPODATA_FN)
+    installer = context.plugin_manager.get_env_installer("conda")
+    result = installer.install(prefix, specs)
+    if newenv:
+        if context.subdir != context._native_subdir():
+            set_keys(
+                ("subdir", context.subdir),
+                path=Path(prefix, ".condarc"),
+            )
+        print_activate(args.name or prefix)
 
-    args_set_update_modifier = (
-        hasattr(args, "update_modifier") and args.update_modifier != NULL
-    )
-    # This helps us differentiate between an update, the --freeze-installed option, and the retry
-    # behavior in our initial fast frozen solve
-    _should_retry_unfrozen = (
-        not args_set_update_modifier
-        or args.update_modifier
-        not in (UpdateModifier.FREEZE_INSTALLED, UpdateModifier.UPDATE_SPECS)
-    ) and not newenv
+    if context.json:
+        common.stdout_json_success(prefix=prefix, actions=result)
+    elif context.dry_run:
+        common.stdout_json_success(prefix=prefix, actions=result, dry_run=True)
+        raise DryRunExit()
 
-    for repodata_fn in repodata_fns:
-        try:
-            if isinstall and args.revision:
-                with get_spinner(f"Collecting package metadata ({repodata_fn})"):
-                    index = get_index(
-                        channel_urls=index_args["channel_urls"],
-                        prepend=index_args["prepend"],  # --override-channels
-                        platform=None,
-                        use_local=index_args["use_local"],  # --use-local
-                        # use_cache=index_args["use_cache"],  # --use-index-cache
-                        # unknown=index_args["unknown"],  # --unknown
-                        prefix=prefix,
-                        repodata_fn=repodata_fn,
-                    )
-                revision_idx = get_revision(args.revision)
-                with get_spinner(f"Reverting to revision {revision_idx}"):
-                    unlink_link_transaction = revert_actions(
-                        prefix, revision_idx, index
-                    )
-            else:
-                solver_backend = context.plugin_manager.get_cached_solver_backend()
-                solver = solver_backend(
-                    prefix,
-                    context_channels,
-                    context.subdirs,
-                    specs_to_add=specs,
-                    repodata_fn=repodata_fn,
-                    command=args.cmd,
-                )
-                update_modifier = context.update_modifier
-                if (isinstall or isremove) and args.update_modifier == NULL:
-                    update_modifier = UpdateModifier.FREEZE_INSTALLED
-                deps_modifier = context.deps_modifier
-                if isupdate:
-                    deps_modifier = context.deps_modifier or DepsModifier.UPDATE_SPECS
-
-                unlink_link_transaction = solver.solve_for_transaction(
-                    deps_modifier=deps_modifier,
-                    update_modifier=update_modifier,
-                    force_reinstall=context.force_reinstall or context.force,
-                    should_retry_solve=(
-                        _should_retry_unfrozen or repodata_fn != repodata_fns[-1]
-                    ),
-                )
-            # we only need one of these to work.  If we haven't raised an exception,
-            #   we're good.
-            break
-
-        except (ResolvePackageNotFound, PackagesNotFoundError) as e:
-            if not getattr(e, "allow_retry", True):
-                raise e  # see note in next except block
-            # end of the line.  Raise the exception
-            if repodata_fn == repodata_fns[-1]:
-                # PackagesNotFoundError is the only exception type we want to raise.
-                #    Over time, we should try to get rid of ResolvePackageNotFound
-                if isinstance(e, PackagesNotFoundError):
-                    raise e
-                else:
-                    channels_urls = tuple(
-                        calculate_channel_urls(
-                            channel_urls=index_args["channel_urls"],
-                            prepend=index_args["prepend"],
-                            platform=None,
-                            use_local=index_args["use_local"],
-                        )
-                    )
-                    # convert the ResolvePackageNotFound into PackagesNotFoundError
-                    raise PackagesNotFoundError(e._formatted_chains, channels_urls)
-
-        except (UnsatisfiableError, SystemExit, SpecsConfigurationConflictError) as e:
-            if not getattr(e, "allow_retry", True):
-                # TODO: This is a temporary workaround to allow downstream libraries
-                # to inject this attribute set to False and skip the retry logic
-                # Other solvers might implement their own internal retry logic without
-                # depending --freeze-install implicitly like conda classic does. Example
-                # retry loop in conda-libmamba-solver:
-                # https://github.com/conda-incubator/conda-libmamba-solver/blob/da5b1ba/conda_libmamba_solver/solver.py#L254-L299
-                # If we end up raising UnsatisfiableError, we annotate it with `allow_retry`
-                # so we don't have go through all the repodatas and freeze-installed logic
-                # unnecessarily (see https://github.com/conda/conda/issues/11294). see also:
-                # https://github.com/conda-incubator/conda-libmamba-solver/blob/7c698209/conda_libmamba_solver/solver.py#L617
-                raise e
-            # Quick solve with frozen env or trimmed repodata failed.  Try again without that.
-            if not hasattr(args, "update_modifier"):
-                if repodata_fn == repodata_fns[-1]:
-                    raise e
-            elif _should_retry_unfrozen:
-                try:
-                    unlink_link_transaction = solver.solve_for_transaction(
-                        deps_modifier=deps_modifier,
-                        update_modifier=UpdateModifier.UPDATE_SPECS,
-                        force_reinstall=context.force_reinstall or context.force,
-                        should_retry_solve=(repodata_fn != repodata_fns[-1]),
-                    )
-                except (
-                    UnsatisfiableError,
-                    SystemExit,
-                    SpecsConfigurationConflictError,
-                ) as e:
-                    # Unsatisfiable package specifications/no such revision/import error
-                    if e.args and "could not import" in e.args[0]:
-                        raise CondaImportError(str(e))
-                    # we want to fall through without raising if we're not at the end of the list
-                    #    of fns.  That way, we fall to the next fn.
-                    if repodata_fn == repodata_fns[-1]:
-                        raise e
-            elif repodata_fn != repodata_fns[-1]:
-                continue  # if we hit this, we should retry with next repodata source
-            else:
-                # end of the line.  Raise the exception
-                # Unsatisfiable package specifications/no such revision/import error
-                if e.args and "could not import" in e.args[0]:
-                    raise CondaImportError(str(e))
-                raise e
-    handle_txn(unlink_link_transaction, prefix, args, newenv)
 
 
 def revert_actions(prefix, revision=-1, index=None):
