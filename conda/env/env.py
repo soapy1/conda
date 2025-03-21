@@ -252,6 +252,10 @@ class Environment:
             return d
         stream.write(json.dumps(d))
 
+    def get_settings(self):
+        """Returns the conda settings for the environment"""
+        return {"channels": self.channels}
+
     def to_yaml(self, stream=None):
         """Convert information related to the ``Environment`` into a ``yaml`` string"""
         d = self.to_dict()

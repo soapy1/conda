@@ -1462,10 +1462,37 @@ class Configuration(metaclass=ConfigurationType):
                     err,
                 )
 
+    @classmethod
+    def _load_env_file_search_path(
+        cls,
+        search_path: Iterable[Path],
+    ) -> Iterable[tuple[Path, dict]]:
+        from ..env import specs
+        from ..env.env import get_filename
+
+        for path in search_path:
+           # TODO: don't use conda.env modules
+           spec = specs.detect(
+                name=None,
+                filename=get_filename(path),
+                directory=None,
+            )
+           env = spec.environment
+           if hasattr(env, "get_settings") and callable(env.get_settings):
+               yield path, EnvironmentSpecificationRawParameter.make_raw_parameters(path, env.get_settings())
+
     def _set_search_path(self, search_path: Iterable[Path | str], **kwargs):
         self._search_path = IndexedSet(self._expand_search_path(search_path, **kwargs))
 
         self._set_raw_data(dict(self._load_search_path(self._search_path)))
+
+        self._reset_cache()
+        return self
+
+    def _set_env_file_search_path(self, search_path: Iterable[Path | str], **kwargs):
+        self._env_file_search_path = IndexedSet(self._expand_search_path(search_path, **kwargs))
+
+        self._set_raw_data(dict(self._load_env_file_search_path(self._env_file_search_path)))
 
         self._reset_cache()
         return self
