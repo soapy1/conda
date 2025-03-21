@@ -14,7 +14,7 @@ import platform
 import struct
 import sys
 from collections import defaultdict
-from collections.abc import Mapping
+from collections.abc import Mapping, Iterable
 from contextlib import contextmanager, suppress
 from errno import ENOENT
 from functools import cache, cached_property
@@ -38,6 +38,7 @@ from ..common.configuration import (
     ConfigurationLoadError,
     ConfigurationType,
     EnvRawParameter,
+    EnvironmentSpecificationRawParameter,
     MapParameter,
     ParameterLoader,
     PrimitiveParameter,
@@ -511,7 +512,7 @@ class Context(Configuration):
 
     no_plugins = ParameterLoader(PrimitiveParameter(NO_PLUGINS))
 
-    def __init__(self, search_path=None, argparse_args=None, **kwargs):
+    def __init__(self, search_path=None, argparse_args=None, env_file_search_path=None, **kwargs):
         super().__init__(argparse_args=argparse_args)
 
         self._set_search_path(
@@ -519,8 +520,36 @@ class Context(Configuration):
             # for proper search_path templating when --name/--prefix is used
             CONDA_PREFIX=determine_target_prefix(self, argparse_args),
         )
+
+        if env_file_search_path is not None:
+            self._set_env_file_search_path(env_file_search_path)
+
         self._set_env_vars(APP_NAME)
         self._set_argparse_args(argparse_args)
+
+
+    def _set_env_file_search_path(self, search_path: Iterable[Path | str], **kwargs):
+        self._env_file_search_path = IndexedSet(self._expand_search_path(search_path, **kwargs))
+
+        self._set_raw_data(dict(self._load_env_file_search_path(self._env_file_search_path)))
+
+        self._reset_cache()
+        return self
+
+    @classmethod
+    def _load_env_file_search_path(
+        cls,
+        search_path: Iterable[Path],
+    ) -> Iterable[tuple[Path, dict]]:
+        for path in search_path:
+            spec_hook = context.plugin_manager.get_env_spec_handler(
+                filename=path,
+            )
+            spec = spec_hook.handler_class(path)
+            if spec.can_handle():
+                env = spec.environment
+                if hasattr(env, "get_settings") and callable(env.get_settings):
+                    yield path, EnvironmentSpecificationRawParameter.make_raw_parameters(path, env.get_settings())
 
     def post_build_validation(self):
         errors = []
