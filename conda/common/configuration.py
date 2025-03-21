@@ -25,7 +25,7 @@ from functools import wraps
 from itertools import chain
 from logging import getLogger
 from os import environ
-from os.path import expandvars
+from os.path import expandvars, isfile
 from pathlib import Path
 from re import IGNORECASE, VERBOSE, compile
 from string import Template
@@ -44,6 +44,7 @@ from ..auxlib.collection import AttrDict, first, last
 from ..auxlib.exceptions import ThisShouldNeverHappenError
 from ..auxlib.type_coercion import TypeCoercionError, typify, typify_data_structure
 from ..common.iterators import unique
+from ..exceptions import EnvironmentFileNotFound
 from .compat import isiterable, primitive_types
 from .constants import NULL
 from .serialize import yaml_round_trip_load
@@ -406,6 +407,46 @@ class YamlRawParameter(RawParameter):
                     position=err.position,
                 )
             return cls.make_raw_parameters(filepath, yaml_obj) or EMPTY_MAP
+
+
+class EnvironmentSpecificationRawParameter(RawParameter):
+    """This class represents a raw parameter originating from an environment specification file"""
+
+    def value(self, parameter_obj):
+        if isiterable(self._raw_value):
+            children_values = []
+            for i in range(len(self._raw_value)):
+                children_values.append(
+                    EnvironmentSpecificationRawParameter(self.source, self.key, self._raw_value[i])
+                )
+            return tuple(children_values)
+        else:
+            return deepfreeze(self._raw_value)
+
+    def keyflag(self):
+        return None
+
+    def valueflags(self, parameter_obj):
+        return None if isinstance(parameter_obj, PrimitiveLoadedParameter) else ()
+
+    @classmethod
+    def make_raw_parameters(cls, source, from_map):
+        """
+        Create an EnvironmentSpecificationRawParameter from an environment specification
+        :param source: the path to the environment specification file
+        :param from_map: a map of key-value pairs representing the configuration from the environment file
+        :return: a map of EnvironmentSpecificationRawParameters
+        """
+        if not isfile(source):
+            raise EnvironmentFileNotFound(filename=source)
+        if from_map:
+            return {
+                key: cls(
+                    source, key, from_map[key]
+                )
+                for key in from_map
+            }
+        return EMPTY_MAP
 
 
 class DefaultValueRawParameter(RawParameter):
