@@ -529,8 +529,7 @@ class Context(Configuration):
 
 
     def _set_env_file_search_path(self, search_path: Iterable[Path | str], **kwargs):
-        self._env_file_search_path = IndexedSet(self._expand_search_path(search_path, **kwargs))
-
+        self._env_file_search_path = [search_path]
         self._set_raw_data(dict(self._load_env_file_search_path(self._env_file_search_path)))
 
         self._reset_cache()

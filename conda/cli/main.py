@@ -54,6 +54,10 @@ def main_subshell(*args, post_parse_hook=None, **kwargs):
     context.__init__(argparse_args=args)
     init_loggers()
 
+    # TODO: find a better way to determine if a file is provided as an environment
+    # and if it should be used as configuration.
+    context.__init__(env_file_search_path=args.file)
+
     # used with main_pip.py
     if post_parse_hook:
         post_parse_hook(args, parser)
