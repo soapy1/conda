@@ -18,23 +18,19 @@ class RequirementsSpec(BaseEnvSpec):
     msg = None
     extensions = {".txt"}
 
-    @deprecated.argument("24.7", "25.1", "name")
     def __init__(self, filename=None, name=None, **kwargs):
         self.filename = filename
         self._name = name  # UNUSED
         self.msg = None
 
     @property
-    @deprecated("24.7", "25.1", addendum="This attribute is not used anymore.")
     def name(self):
         return self._name
 
     @name.setter
-    @deprecated("24.7", "25.1", addendum="This attribute is not used anymore.")
     def name(self, value):
         self._name = value
 
-    @deprecated("24.7", "25.1", addendum="This method is not used anymore.")
     def _valid_file(self):
         if os.path.exists(self.filename):
             return True
@@ -42,7 +38,6 @@ class RequirementsSpec(BaseEnvSpec):
             self.msg = "There is no requirements.txt"
             return False
 
-    @deprecated("24.7", "25.1", addendum="This method is not used anymore.")
     def _valid_name(self):
         if self.name is None:
             return False

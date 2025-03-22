@@ -21,11 +21,6 @@ if TYPE_CHECKING:
     SpecTypes = YamlFileSpec | RequirementsSpec
 
 
-@deprecated(
-    "24.7",
-    "25.1",
-    addendum="Use conda.base.context.plugin_manager.get_env_spec_handler.",
-)
 def get_spec_class_from_file(filename: str) -> FileSpecTypes:
     """
     Determine spec class to use from the provided ``filename``
@@ -56,10 +51,6 @@ def get_spec_class_from_file(filename: str) -> FileSpecTypes:
     raise EnvironmentFileNotFound(filename=filename)
 
 
-@deprecated.argument("24.7", "25.1", "name")
-@deprecated.argument(
-    "24.7", "25.1", "directory", addendum="Specify the full path in filename"
-)
 def detect(
     name: str | None = None,
     filename: str | None = None,
