@@ -124,7 +124,6 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
         directory=os.getcwd(),
     )
     env = spec.environment
-    context.add_environment_file_config_source(args.file, env.get_configuration())
 
     # FIXME conda code currently requires args to have a name or prefix
     # don't overwrite name if it's given. gh-254
