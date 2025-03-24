@@ -6,7 +6,7 @@ import json
 import os
 import re
 from itertools import chain
-from os.path import abspath, expanduser, expandvars
+from os.path import abspath, expanduser, expandvars, join
 
 from ..base.context import context
 from ..cli import common, install
@@ -267,6 +267,13 @@ class Environment:
     def get_configuration(self):
         """Returns the conda settings for the environment"""
         return {"channels": self.channels}
+
+    def write_env_conda_rc(self):
+        """Writes the environment conda settings to the environment's condarc file"""
+        config = self.get_configuration()
+        rc_path = join(context.target_prefix, ".condarc")
+        with open(rc_path, "w+") as fp:
+            yaml_safe_dump(config, stream=fp)
 
 
 def get_filename(filename):

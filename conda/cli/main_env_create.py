@@ -108,12 +108,13 @@ def configure_parser(sub_parsers: _SubParsersAction, **kwargs) -> ArgumentParser
 @notices
 def execute(args: Namespace, parser: ArgumentParser) -> int:
     from ..auxlib.ish import dals
-    from ..base.context import context, determine_target_prefix
+    from ..base.context import context, determine_target_prefix, reset_context
     from ..cli.main_rename import check_protected_dirs
     from ..core.prefix_data import PrefixData
     from ..env import specs
     from ..env.env import get_filename, print_result, Environment
     from ..exceptions import InvalidInstaller
+    from ..gateways.disk import mkdir_p
     from ..gateways.disk.delete import rm_rf
     from ..misc import touch_nonadmin
     from . import install as cli_install
@@ -137,6 +138,14 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
     cli_install.check_prefix(prefix, json=args.json)
     check_protected_dirs(prefix)
 
+
+    # create the prefix
+    mkdir_p(prefix)
+    # write the .condarc for the environment configuration     
+    env.write_env_conda_rc()
+    # reload the context to pick up the new config
+    reset_context(argparse_args=args)
+
     # TODO, add capability
     # common.ensure_override_channels_requires_channel(args)
     # channel_urls = args.channel or ()
@@ -149,7 +158,7 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
 
     if args.dry_run:
         installer_type = "conda"
-        installer = context.plugin_manager.get_env_installer(installer_type)
+        installer = context.plugizn_manager.get_env_installer(installer_type)
 
         pkg_specs = env.dependencies.get(installer_type, [])
         pkg_specs.extend(args_packages)
