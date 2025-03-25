@@ -25,6 +25,7 @@ if TYPE_CHECKING:
 
     from ..common.configuration import Parameter
     from ..core.solve import Solver
+    from ..env.env import Environment
     from ..models.match_spec import MatchSpec
 
 
@@ -347,3 +348,18 @@ class CondaRequestHeader:
 
     name: str
     value: str
+
+@dataclass
+class CondaEnvSpec:
+    """
+    Return type to use when defining a conda env spec plugin hook.
+    For details on how this is used, see
+    :meth:`~conda.plugins.hookspec.CondaSpecs.conda_env_specs`.
+    :param name: name of the spec (e.g., ``environment_yaml``)
+    
+    TODO
+    """
+
+    name: str
+    can_handle: bool
+    environment: Environment
