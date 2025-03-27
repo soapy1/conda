@@ -134,14 +134,12 @@ def from_environment(
     )
 
 
-def from_yaml(yamlstr, **kwargs):
+def from_yaml(yamlstr, filename, **kwargs):
     """Load and return a ``Environment`` from a given ``yaml`` string"""
     data = yaml_safe_load(yamlstr)
-    filename = kwargs.get("filename")
     if data is None:
         raise EnvironmentFileEmpty(filename)
     data = validate_keys(data, kwargs)
-
     if kwargs is not None:
         for key, value in kwargs.items():
             data[key] = value
@@ -208,19 +206,17 @@ class Dependencies(dict):
 
 
 class Environment:
-    """A class representing an ``environment.yaml`` file"""
+    """A class representing an environment"""
 
     def __init__(
         self,
         name=None,
-        filename=None,
         channels=None,
         dependencies=None,
         prefix=None,
         variables=None,
     ):
         self.name = name
-        self.filename = filename
         self.prefix = prefix
         self.dependencies = Dependencies(dependencies)
         self.variables = variables
@@ -259,9 +255,9 @@ class Environment:
         if stream is None:
             return out
 
-    def save(self):
+    def save(self, filename):
         """Save the ``Environment`` data to a ``yaml`` file"""
-        with open(self.filename, "wb") as fp:
+        with open(filename, "wb") as fp:
             self.to_yaml(stream=fp)
 
 
