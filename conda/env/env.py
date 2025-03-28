@@ -215,12 +215,13 @@ class Environment:
         dependencies=None,
         prefix=None,
         variables=None,
+        context=None
     ):
         self.name = name
         self.prefix = prefix
         self.dependencies = Dependencies(dependencies)
         self.variables = variables
-
+        self.context = context
         if channels is None:
             channels = []
         self.channels = channels
