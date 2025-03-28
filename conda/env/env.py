@@ -258,6 +258,7 @@ class Environment:
 
     def save(self, filename):
         """Save the ``Environment`` data to a ``yaml`` file"""
+        self.context = context.to_dict()
         with open(filename, "wb") as fp:
             self.to_yaml(stream=fp)
 
