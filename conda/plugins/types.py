@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 from requests.auth import AuthBase
 
-from ..models.records import PackageRecord
+from ..models.records import PackageRecord, PrefixRecord
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser, Namespace
@@ -26,6 +26,7 @@ if TYPE_CHECKING:
     from ..common.configuration import Parameter
     from ..core.solve import Solver
     from ..models.match_spec import MatchSpec
+    from ..api import PrefixData
 
 
 @dataclass
@@ -347,3 +348,12 @@ class CondaRequestHeader:
 
     name: str
     value: str
+
+@dataclass
+class CondaPrefixDataLoader:
+    """
+    Define a method for loading prefix data
+    """
+
+    name: str
+    load: Callable[[str, PrefixData], dict[str, PrefixRecord]]
