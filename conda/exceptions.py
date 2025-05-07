@@ -1251,8 +1251,13 @@ class EnvironmentFileNotFound(CondaEnvException):
 
 
 class EnvironmentFileExtensionNotValid(CondaEnvException):
-    def __init__(self, filename: os.PathLike, *args, **kwargs):
-        msg = f"'{filename}' file extension must be one of '.txt', '.yaml' or '.yml'"
+    def __init__(
+        self, filename: os.PathLike, extensions: list | None = None, *args, **kwargs
+    ):
+        if extensions is None:
+            extensions = [".txt", ".yaml", ".yml"]
+        extensions_str = ", ".join(extensions)
+        msg = f"'{filename}' file extension must be one of: {extensions_str}"
         self.filename = filename
         super().__init__(msg, *args, **kwargs)
 
@@ -1272,16 +1277,7 @@ class EnvironmentFileNotDownloaded(CondaError):
         super().__init__(msg, *args, **kwargs)
 
 
-class SpecNotFound(CondaError):
-    def __init__(self, msg: str, *args, **kwargs):
-        super().__init__(msg, *args, **kwargs)
-
-
-class PluginError(CondaError):
-    pass
-
-
-class EnvSpecPluginNotDetected(CondaError):
+class EnvironmentSpecPluginNotDetected(CondaError):
     def __init__(self, name, plugin_names, *args, **kwargs):
         self.name = name
         msg = dals(
@@ -1293,6 +1289,15 @@ class EnvSpecPluginNotDetected(CondaError):
             """
         )
         super().__init__(msg, *args, **kwargs)
+
+
+class SpecNotFound(CondaError):
+    def __init__(self, msg: str, *args, **kwargs):
+        super().__init__(msg, *args, **kwargs)
+
+
+class PluginError(CondaError):
+    pass
 
 
 def maybe_raise(error: BaseException, context: Context):

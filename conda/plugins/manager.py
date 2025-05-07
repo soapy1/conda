@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import os
 from importlib.metadata import distributions
 from inspect import getmodule, isclass
 from typing import TYPE_CHECKING, overload
@@ -24,7 +25,8 @@ from ..base.context import add_plugin_setting, context
 from ..deprecations import deprecated
 from ..exceptions import (
     CondaValueError,
-    EnvSpecPluginNotDetected,
+    EnvironmentSpecPluginNotDetected,
+    EnvironmentFileExtensionNotValid,
     PluginError,
 )
 from . import (
@@ -487,17 +489,42 @@ class CondaPluginManager(pluggy.PluginManager):
         for name, (parameter, aliases) in self.get_settings().items():
             add_plugin_setting(name, parameter, aliases)
 
-    def get_environment_specifier_handler(
-        self, filename: str
-    ) -> CondaEnvironmentSpecifier:
+    def get_environment_specifiers(self, filename: str) -> CondaEnvironmentSpecifier:
         hooks = self.get_hook_results("environment_specifiers")
-        for hook in hooks:
-            if hook.environment_spec(filename).can_handle():
-                return hook
+        if filename.startswith("file://"):
+            filename = filename[len("file://") :]
 
-        # raise error if no plugins found that can read the environment file
-        hook_names = [h.name for h in hooks]
-        raise EnvSpecPluginNotDetected(name=filename, plugin_names=hook_names)
+        # Check extensions
+        hook_extensions = set().union(
+            *(hook.environment_spec.extensions for hook in hooks)
+        )
+        _, ext = os.path.splitext(filename)
+        if ext == "" or ext not in hook_extensions:
+            raise EnvironmentFileExtensionNotValid(filename, extensions=hook_extensions)
+
+        # Find a spec that can handle the filename
+        capable_hooks = [
+            hook for hook in hooks if hook.environment_spec(filename).can_handle()
+        ]
+        if len(capable_hooks) == 1:
+            return capable_hooks[0]
+        elif len(capable_hooks) > 1:
+            raise PluginError(
+                dals(
+                    f"""
+                    Multiple plugins found that can handle the environment file '{filename}':
+
+                    {", ".join([hook.name for hook in capable_hooks])}
+
+                    Please make sure that you don't have any incompatible plugins installed.
+                    """
+                )
+            )
+        else:
+            # raise error if no plugins found that can read the environment file
+            raise EnvironmentSpecPluginNotDetected(
+                name=filename, plugin_names=[hook.name for hook in hooks]
+            )
 
 
 @functools.cache
