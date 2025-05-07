@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import functools
 import logging
+import os
 from importlib.metadata import distributions
 from inspect import getmodule, isclass
 from typing import TYPE_CHECKING, overload
@@ -490,6 +491,33 @@ class CondaPluginManager(pluggy.PluginManager):
 
     def get_environment_specifiers(self, filename: str) -> CondaEnvironmentSpecifier:
         hooks = self.get_hook_results("environment_specifiers")
+        if filename.startswith("file://"):
+            filename = filename[len("file://") :]
+
+        # Check extensions
+        hook_extensions = set().union(
+            *(hook.environment_spec.extensions for hook in hooks)
+        )
+        _, ext = os.path.splitext(filename)
+        if ext == "" or ext not in hook_extensions:
+            raise EnvironmentFileExtensionNotValid(filename, extensions=hook_extensions)
+
+        # Find a spec that can handle the filename
+        capable_hooks = [
+            hook for hook in hooks if hook.environment_spec(filename).can_handle()
+        ]
+        if len(capable_hooks) > 1:
+            raise PluginError(
+                dals(
+                    f"""
+                    Multiple plugins found that can handle the environment file '{filename}':
+
+                    {", ".join([hook.name for hook in capable_hooks])}
+
+                    Please make sure that you don't have any incompatible plugins installed.
+                    """
+                )
+            )
         for hook in hooks:
             if hook.environment_spec(filename).can_handle():
                 return hook
