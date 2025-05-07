@@ -506,7 +506,9 @@ class CondaPluginManager(pluggy.PluginManager):
         capable_hooks = [
             hook for hook in hooks if hook.environment_spec(filename).can_handle()
         ]
-        if len(capable_hooks) > 1:
+        if len(capable_hooks) == 1:
+            return capable_hooks[0]
+        elif len(capable_hooks) > 1:
             raise PluginError(
                 dals(
                     f"""
@@ -518,14 +520,11 @@ class CondaPluginManager(pluggy.PluginManager):
                     """
                 )
             )
-        for hook in hooks:
-            if hook.environment_spec(filename).can_handle():
-                return hook
-
-        # raise error if no plugins found that can read the environment file
-        raise EnvironmentSpecPluginNotDetected(
-            name=filename, plugin_names=[hook.name for hook in hooks]
-        )
+        else:
+            # raise error if no plugins found that can read the environment file
+            raise EnvironmentSpecPluginNotDetected(
+                name=filename, plugin_names=[hook.name for hook in hooks]
+            )
 
 
 @functools.cache
