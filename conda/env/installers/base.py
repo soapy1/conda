@@ -4,7 +4,8 @@
 
 import importlib
 
-from ...exceptions import InvalidInstaller
+from ...base.context import context
+from ...exceptions import InvalidInstaller, PluginError
 
 
 def get_installer(name):
@@ -13,7 +14,12 @@ def get_installer(name):
 
     Raises: InvalidInstaller if unable to load installer
     """
-    try:
+    # Return the conda module for conda installers
+    if name == "conda":
         return importlib.import_module(f"conda.env.installers.{name}")
-    except ImportError:
+
+    # If not using the conda installer, load the installer from the plugin manager
+    try:
+        return context.plugin_manager.get_installer(name).installer()
+    except PluginError:
         raise InvalidInstaller(name)
