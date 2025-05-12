@@ -3,12 +3,28 @@
 """Define YAML spec."""
 
 import os
+import re
 
 from ruamel.yaml.error import YAMLError
 
+from ...base.context import context
+from ...common.serialize import yaml_safe_load
 from ...exceptions import EnvironmentFileEmpty, EnvironmentFileNotFound
+from ...gateways.connection.download import download_text
+from ...gateways.connection.session import CONDA_SESSION_SCHEMES
+from ...models.environment import Environment
+from ...models.match_spec import MatchSpec
 from ...plugins.types import EnvironmentSpecBase
-from .. import env
+
+
+VALID_KEYS = ("name", "dependencies", "prefix", "channels", "variables")
+
+
+def _expand_channels(data):
+    """Expands ``Environment`` variables for the channels found in the ``yaml`` data"""
+    data["channels"] = [
+        os.path.expandvars(channel) for channel in data.get("channels", [])
+    ]
 
 
 class YamlFileSpec(EnvironmentSpecBase):
@@ -18,6 +34,73 @@ class YamlFileSpec(EnvironmentSpecBase):
     def __init__(self, filename=None, **kwargs):
         self.filename = filename
         self.msg = None
+
+    def _validate_keys(self, data):
+        """Check for unknown keys, remove them and print a warning"""
+        invalid_keys = []
+        new_data = data.copy() if data else {}
+        for key in data.keys():
+            if key not in VALID_KEYS:
+                invalid_keys.append(key)
+                new_data.pop(key)
+
+        if invalid_keys:
+            verb = "are" if len(invalid_keys) != 1 else "is"
+            plural = "s" if len(invalid_keys) != 1 else ""
+            print(
+                f"\nEnvironmentSectionNotValid: The following section{plural} on "
+                f"'{self.filename}' {verb} invalid and will be ignored:"
+            )
+            for key in invalid_keys:
+                print(f" - {key}")
+            print()
+
+        deps = data.get("dependencies", [])
+        depsplit = re.compile(r"[<>~\s=]")
+        is_pip = lambda dep: "pip" in depsplit.split(dep)[0].split("::")
+        lists_pip = any(is_pip(dep) for dep in deps if not isinstance(dep, dict))
+        for dep in deps:
+            if isinstance(dep, dict) and "pip" in dep and not lists_pip:
+                print(
+                    "Warning: you have pip-installed dependencies in your environment file, "
+                    "but you do not list pip itself as one of your conda dependencies.  Conda "
+                    "may not use the correct pip to install your packages, and they may end up "
+                    "in the wrong place.  Please add an explicit pip dependency.  I'm adding one"
+                    " for you, but still nagging you."
+                )
+                new_data["dependencies"].insert(0, "pip")
+                break
+        return new_data
+
+    def _load_environment(self):
+        """Load environment from file."""
+        url_scheme = self.filename.split("://", 1)[0]
+
+        if url_scheme in CONDA_SESSION_SCHEMES:
+            yamlstr = download_text(self.filename)
+        elif not os.path.exists(self.filename):
+            raise EnvironmentFileNotFound(self.filename)
+        else:
+            with open(self.filename, "rb") as fp:
+                yamlb = fp.read()
+                try:
+                    yamlstr = yamlb.decode("utf-8")
+                except UnicodeDecodeError:
+                    yamlstr = yamlb.decode("utf-16")
+        
+        data = yaml_safe_load(yamlstr)
+        if data is None:
+            raise EnvironmentFileEmpty(self.filename)
+        data = self._validate_keys(data)
+        _expand_channels(data)
+    
+        return Environment(
+            name=data.get("name"),
+            prefix=data.get("prefix"),
+            variables=data.get("variables"),
+            configuration={"channels": data.get("channels", context.channels)},
+            requirements=[MatchSpec(dep) for dep in data.get("dependencies", [])],
+        )
 
     def can_handle(self):
         """
@@ -38,7 +121,7 @@ class YamlFileSpec(EnvironmentSpecBase):
             return False
 
         try:
-            self._environment = env.from_file(self.filename)
+            self._environment = self._load_environment()
             return True
         except EnvironmentFileNotFound as e:
             self.msg = str(e)
