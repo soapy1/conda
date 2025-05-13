@@ -175,32 +175,30 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
             installer_type = "conda"
             installer = get_installer(installer_type)
             result[installer_type] = installer.install(prefix, args_packages, args, env)
+        
+        # Install conda packages first
+        native_installer = get_installer("conda")
+        result["conda"] = native_installer.install(prefix, env.specs, args, env)
 
-        if len(env.dependencies.items()) == 0:
-            installer_type = "conda"
-            pkg_specs = []
-            installer = get_installer(installer_type)
-            result[installer_type] = installer.install(prefix, pkg_specs, args, env)
-        else:
-            for installer_type, pkg_specs in env.dependencies.items():
-                try:
-                    installer = get_installer(installer_type)
-                    result[installer_type] = installer.install(
-                        prefix, pkg_specs, args, env
-                    )
-                except InvalidInstaller:
-                    raise CondaError(
-                        dals(
-                            f"""
-                            Unable to install package for {installer_type}.
+        for installer_type, pkg_specs in env.external_packages.items():
+            try:
+                installer = get_installer(installer_type)
+                result[installer_type] = installer.install(
+                    prefix, pkg_specs, args, env
+                )
+            except InvalidInstaller:
+                raise CondaError(
+                    dals(
+                        f"""
+                        Unable to install package for {installer_type}.
 
-                            Please double check and ensure your dependencies file has
-                            the correct spelling. You might also try installing the
-                            conda-env-{installer_type} package to see if provides
-                            the required installer.
-                            """
-                        )
+                        Please double check and ensure your dependencies file has
+                        the correct spelling. You might also try installing the
+                        conda-env-{installer_type} package to see if provides
+                        the required installer.
+                        """
                     )
+                )
 
         if env.variables:
             prefix_data.set_environment_env_vars(env.variables)
