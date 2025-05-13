@@ -27,11 +27,15 @@ class Environment:
     prefix: str | None = None
 
     # User requested specs for this environment.
-    requirements: list[MatchSpec] | None = None
+    specs: list[MatchSpec] | None = None
+
+    # Map of other package types that conda can install. For example pypi packages.
+    # TODO: not sure if this is an ok way to capture this information
+    external_packages: dict[str, list]  | None = None
 
     # The complete list of specs for the environment.
     # eg. after a solve, or from an explicit environemnt spec
-    specs: list[PackageRecord] | None = None
+    records: list[PackageRecord] | None = None
 
     # Merged configuration for the environment.
     configuration: dict[str, Any] | None = field(default_factory=dict)
