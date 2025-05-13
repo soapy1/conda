@@ -108,7 +108,7 @@ class YamlFileSpec(EnvironmentSpecBase):
             if isinstance(dep, dict):
                 external_packages.update(dep)
             elif isinstance(dep, str):
-                specs.append(dep)
+                specs.append(MatchSpec(dep))
 
         env.specs = specs
         env.external_packages = external_packages

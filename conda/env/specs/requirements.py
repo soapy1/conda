@@ -5,8 +5,9 @@
 import os
 
 from ...deprecations import deprecated
+from ...models.match_spec import MatchSpec
+from ...models.environment import Environment
 from ...plugins.types import EnvironmentSpecBase
-from ..env import Environment
 
 
 class RequirementsSpec(EnvironmentSpecBase):
@@ -79,5 +80,5 @@ class RequirementsSpec(EnvironmentSpecBase):
                 line = line.strip()
                 if not line or line.startswith("#"):
                     continue
-                dependencies.append(line)
-        return Environment(dependencies=dependencies)
+                dependencies.append(MatchSpec(line))
+        return Environment(specs=dependencies)
