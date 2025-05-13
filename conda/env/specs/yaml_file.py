@@ -93,15 +93,27 @@ class YamlFileSpec(EnvironmentSpecBase):
             raise EnvironmentFileEmpty(self.filename)
         data = self._validate_keys(data)
         _expand_channels(data)
-    
-        return Environment(
+
+        deps = data.get("dependencies", {})
+        env = Environment(
             name=data.get("name"),
             prefix=data.get("prefix"),
             variables=data.get("variables"),
             configuration={"channels": data.get("channels", context.channels)},
-            requirements=[MatchSpec(dep) for dep in data.get("dependencies", [])],
         )
 
+        specs = []
+        external_packages = {}
+        for dep in deps:
+            if isinstance(dep, dict):
+                external_packages.update(dep)
+            elif isinstance(dep, str):
+                specs.append(dep)
+
+        env.specs = specs
+        env.external_packages = external_packages
+        return env
+        
     def can_handle(self):
         """
         Validates loader can process environment definition.
