@@ -13,8 +13,9 @@ if TYPE_CHECKING:
 
 from ...common.url import path_to_url
 from ...deprecations import deprecated
+from ...models.match_spec import MatchSpec
+from ...models.environment import Environment
 from ...plugins.types import EnvironmentSpecBase
-from ..env import Environment
 from ..explicit import ExplicitEnvironment
 
 
@@ -160,7 +161,7 @@ class RequirementsSpec(EnvironmentSpecBase):
         lines = self._read_file_lines()
         if lines is None:
             raise ValueError(f"Unable to read file {self.filename}: {self.msg}")
-        return Environment(dependencies=lines)
+        return Environment(specs=[MatchSpec(l) for l in lines])
 
 
 class ExplicitRequirementsSpec(RequirementsSpec):
