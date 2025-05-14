@@ -560,6 +560,16 @@ class Context(Configuration):
         self._set_env_vars(APP_NAME)
         self._set_argparse_args(argparse_args)
 
+    def to_dict(self):
+        context_keys = ()
+        for keys in self.category_map.values():
+            context_keys += keys
+
+        return {
+            key: getattr(self, key)
+            for key in context_keys
+        }
+
     def post_build_validation(self) -> list[ValidationError]:
         errors = []
         if self.client_ssl_cert_key and not self.client_ssl_cert:
