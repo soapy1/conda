@@ -164,7 +164,7 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
         pkg_specs = env.dependencies.get(installer_type, [])
         pkg_specs.extend(args_packages)
 
-        solved_env = installer.dry_run(pkg_specs, args, env)
+        solved_env = installer.dry_run(pkg_specs, env)
         if args.json:
             print(json.dumps(solved_env.to_dict(), indent=2))
         else:

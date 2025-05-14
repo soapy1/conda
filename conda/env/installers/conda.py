@@ -15,7 +15,7 @@ from ...exceptions import UnsatisfiableError
 from ...models.channel import Channel, prioritize_channels
 
 
-def _solve(prefix, specs, args, env, *_, **kwargs):
+def _solve(prefix, specs, env, *_, **kwargs):
     """Solve the environment"""
     # TODO: support all various ways this happens
     channels = env.configuration.get("channels", [])
@@ -35,9 +35,9 @@ def _solve(prefix, specs, args, env, *_, **kwargs):
     return solver
 
 
-def dry_run(specs, args, env, *_, **kwargs):
+def dry_run(specs, env, *_, **kwargs):
     """Do a dry run of the environment solve"""
-    solver = _solve(tempfile.mkdtemp(), specs, args, env, *_, **kwargs)
+    solver = _solve(tempfile.mkdtemp(), specs, env, *_, **kwargs)
     pkgs = solver.solve_final_state()
     solved_env = Environment(
         name=env.name, dependencies=[str(p) for p in pkgs], channels=env.channels
@@ -47,7 +47,7 @@ def dry_run(specs, args, env, *_, **kwargs):
 
 def install(prefix, specs, args, env, *_, **kwargs):
     """Install packages into an environment"""
-    solver = _solve(prefix, specs, args, env, *_, **kwargs)
+    solver = _solve(prefix, specs, env, *_, **kwargs)
 
     try:
         unlink_link_transaction = solver.solve_for_transaction(
