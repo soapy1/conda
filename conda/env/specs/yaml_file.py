@@ -94,15 +94,9 @@ class YamlFileSpec(EnvironmentSpecBase):
         data = self._validate_keys(data)
         _expand_channels(data)
 
-
-        # Hmmm, not sure this is a good idea? Trying it out. I really
-        # don't like the responsibility of merging configs to be left
-        # up to the plugin author. This is a tricky bit that if it goes
-        # wrong, can really mess up the rest of conda's execution.
-        # Get full config from the context
-        config = context.to_dict()
-        # Overwrite the config with configuration from the environment file
-        config.update({"channels": data.get("channels", context.channels)})
+        config = {}
+        if len(data.get("channels", [])) > 0:
+            config = {"channels": data.get("channels")}
 
         deps = data.get("dependencies", {})
         env = Environment(

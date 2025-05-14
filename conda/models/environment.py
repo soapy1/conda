@@ -2,6 +2,8 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Conda environment data model"""
 
+from ..base.context import context
+
 from dataclasses import dataclass, field
 from typing import Any
 from .match_spec import MatchSpec
@@ -14,11 +16,23 @@ class Environment:
     def __init__(
             self, name=None, prefix=None, requirements=None, specs=None, configuration=None, variables=None
         ):
+        # TODO: make this configuration/context overwriting less janky
+        # The approach is to:
+        #   1. let the plugin provide a dict of configuration to the environment
+        #   2. the environment can choose how to merge the provided config into the 
+        #      context object.
+        #   3. store the merged context object as a configuration that can be used
+        #      as a source of truth later
+        # get the configuration from the context
+        context_config = context.to_dict()
+        # overwrite global config with incoming configuration
+        context_config.update(configuration)
+
         self.name = name
         self.prefix = prefix
         self.requirements = requirements or []
         self.specs = specs or []
-        self.configuration = configuration or {}
+        self.configuration = context_config
         self.variables = variables or {}
 
     # Environment name. One name or prefix is required.
