@@ -2,12 +2,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Conda environment data model"""
 
-from dataclasses import field
+from dataclasses import dataclass, field
 from typing import Any
 from .match_spec import MatchSpec
 from .records import PackageRecord
 
 
+@dataclass
 class Environment:
 
     def __init__(
