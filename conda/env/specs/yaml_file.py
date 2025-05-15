@@ -99,7 +99,6 @@ class YamlFileSpec(EnvironmentSpecBase):
             name=data.get("name"),
             prefix=data.get("prefix"),
             variables=data.get("variables"),
-            configuration={"channels": data.get("channels", context.channels)},
         )
 
         specs = []
