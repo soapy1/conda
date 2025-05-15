@@ -94,11 +94,16 @@ class YamlFileSpec(EnvironmentSpecBase):
         data = self._validate_keys(data)
         _expand_channels(data)
 
+        env_config = {}
+        if data.get("channels", None) is not None:
+            env_config["channels"] = data.get("channels")
+
         deps = data.get("dependencies", {})
         env = Environment(
             name=data.get("name"),
             prefix=data.get("prefix"),
             variables=data.get("variables"),
+            environment_config=env_config,
         )
 
         specs = []

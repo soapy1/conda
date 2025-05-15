@@ -13,9 +13,10 @@ from ..base.context import context
 class Environment:
 
     def __init__(
-            self, external_packages=None, name=None, prefix=None, requirements=None, specs=None, variables=None
+            self, external_packages=None, environment_config={}, name=None, prefix=None, requirements=None, specs=None, variables=None
         ):
         self.external_packages = external_packages
+        self.environment_config = environment_config
         self.name = name
         self.prefix = prefix
         self.requirements = requirements or []
@@ -25,6 +26,9 @@ class Environment:
     # Map of other package types that conda can install. For example pypi packages.
     # TODO: not sure if this is an ok way to capture this information
     external_packages: dict[str, list]  | None = None
+
+    # Environment level configuration, eg. channels, solver options, etc.
+    environment_config: dict[str, Any] = field(default_factory=dict)
 
     # Environment name. One name or prefix is required.
     name: str |  None = None

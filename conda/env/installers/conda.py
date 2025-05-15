@@ -27,7 +27,7 @@ def _solve(prefix, specs, args, env, *_, **kwargs):
     :return: Solver object
     """
     # TODO: support all various ways this happens
-    channels = env.configuration.get("channels", [])
+    channels = env.environment_config.get("channels", context.channels)
     
     # Including 'nodefaults' in the channels list disables the defaults
     channel_urls = [chan for chan in channels if chan != "nodefaults"]
