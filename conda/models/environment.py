@@ -13,17 +13,14 @@ from ..base.context import context
 class Environment:
 
     def __init__(
-            self, name=None, prefix=None, requirements=None, specs=None, configuration=None, variables=None
+            self, external_packages=None, name=None, prefix=None, requirements=None, specs=None, variables=None
         ):
+        self.external_packages = external_packages
         self.name = name
         self.prefix = prefix
         self.requirements = requirements or []
         self.specs = specs or []
-        self.configuration = configuration or {}
         self.variables = variables or {}
-
-    # Merged configuration for the environment.
-    configuration: dict[str, Any] | None = field(default_factory=dict)
 
     # Map of other package types that conda can install. For example pypi packages.
     # TODO: not sure if this is an ok way to capture this information
