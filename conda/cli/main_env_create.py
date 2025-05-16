@@ -178,7 +178,7 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
         
         # Install conda packages first
         native_installer = get_installer("conda")
-        result["conda"] = native_installer.install(prefix, env.specs, args, env)
+        result["conda"] = native_installer.install(prefix, env.requested_specs, args, env)
 
         if env.external_packages is not None:
             for installer_type, pkg_specs in env.external_packages.items():

@@ -114,7 +114,7 @@ class YamlFileSpec(EnvironmentSpecBase):
             elif isinstance(dep, str):
                 specs.append(MatchSpec(dep))
 
-        env.specs = specs
+        env.requested_specs = specs
         env.external_packages = external_packages
         return env
         

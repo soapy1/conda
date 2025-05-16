@@ -336,6 +336,11 @@ def install_clone(args, parser):
 
 def install(args, parser, command="install"):
     """Logic for `conda install`, `conda update`, `conda remove`, and `conda create`."""
+    newenv = command == "create"
+    isupdate = command == "update"
+    isinstall = command == "install"
+    isremove = command == "remove"
+
     if newenv and args.clone:
         deprecated.topic(
             "25.9",
@@ -354,11 +359,6 @@ def install(args, parser, command="install"):
 
     if context.use_only_tar_bz2:
         args.repodata_fns = ("repodata.json",)
-
-    newenv = command == "create"
-    isupdate = command == "update"
-    isinstall = command == "install"
-    isremove = command == "remove"
 
     # collect packages provided from the command line
     args_packages = [s.strip("\"'") for s in args.packages]
