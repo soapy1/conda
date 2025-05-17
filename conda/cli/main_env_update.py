@@ -166,10 +166,10 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
 
     result = {"conda": None, "pip": None}
     
-    if env.specs:
+    if env.requested_specs:
         installer_type = "conda"
         installer = get_installer(installer_type)
-        result[installer_type] = installer.install(prefix, env.specs, args, env)
+        result[installer_type] = installer.install(prefix, env.requested_specs, args, env)
     
     for installer_type, specs in env.external_packages.items():
         installer = installers[installer_type]

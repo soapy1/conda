@@ -5,6 +5,7 @@
 import logging
 import os
 import tempfile
+from typing import Any
 from os.path import basename
 
 from boltons.setutils import IndexedSet

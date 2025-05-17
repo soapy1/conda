@@ -16,7 +16,6 @@ from ...deprecations import deprecated
 from ...models.match_spec import MatchSpec
 from ...models.environment import Environment
 from ...plugins.types import EnvironmentSpecBase
-from ..explicit import ExplicitEnvironment
 
 
 class RequirementsSpec(EnvironmentSpecBase):
@@ -225,8 +224,6 @@ class ExplicitRequirementsSpec(RequirementsSpec):
 
             processed_lines.append(line)
 
-        # Return the processed lines that will be passed to ExplicitEnvironment
-        # and eventually to the explicit() function in conda.misc
         return processed_lines
 
     def _is_valid_content(self) -> bool:
@@ -259,11 +256,8 @@ class ExplicitRequirementsSpec(RequirementsSpec):
             packages = self._parse_explicit_file()
             if packages is None:
                 raise ValueError(f"Unable to handle file {self.filename}: {self.msg}")
-
-            # Create an explicit environment with the packages
-            # Using the typed ExplicitEnvironment class signals that this is from an explicit file
-            # and should bypass the solver according to CEP-23
-            return ExplicitEnvironment(dependencies=packages, filename=self.filename)
+            
+            return Environment(explicit_specs=packages)
         except Exception as e:
             self.msg = f"Error creating environment from {self.filename}: {str(e)}"
             raise ValueError(self.msg) from e
