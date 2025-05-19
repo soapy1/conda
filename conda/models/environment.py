@@ -8,7 +8,7 @@ from typing import Any
 
 from .match_spec import MatchSpec
 from ..base.context import context
-from ..exceptions import CondaError
+from ..exceptions import CondaError, NeedsNameOrPrefix
 
 
 log = getLogger(__name__)
@@ -18,14 +18,14 @@ log = getLogger(__name__)
 class Environment:
     # Map of other package types that conda can install. For example pypi packages.
     # TODO: not sure if this is an ok way to capture this information
-    external_packages: dict[str, list]  | None = None
+    external_packages: dict[str, list]  = field(default_factory=dict)
 
     # Environment level configuration, eg. channels, solver options, etc.
     environment_config: dict[str, Any] = field(default_factory=dict)
 
     # The complete list of specs for the environment.
     # eg. after a solve, or from an explicit environemnt spec
-    explicit_specs: list[MatchSpec] | None = None
+    explicit_specs: list[MatchSpec] = field(default_factory=list)
 
     # Environment name. One name or prefix is required.
     name: str |  None = None
@@ -38,18 +38,20 @@ class Environment:
     platform: str = context.subdir
 
     # User requested specs for this environment.
-    requested_specs: list[MatchSpec] | None = None
+    requested_specs: list[MatchSpec] = field(default_factory=list)
 
     # Environment variables to be applied to the environment.
-    variables: dict[str, str] | None = None
+    variables: dict[str, str] = field(default_factory=dict)
 
+    def __post_init__(self):
+        if not self.name and not self.prefix:
+            raise NeedsNameOrPrefix("'Environment' needs either 'name' or 'prefix'.")
+    
     @classmethod
-    def merge(cls, *environments: Environment, validate: bool = True) -> Environment:
+    def merge(cls, *environments):
         """
         Keeps first name and/or prefix. Both if their basename match. Otherwise name wins.
-        Keeps first description, channel_options, solver_options.
-        Keeps max last_modified.
-        Concatenates and deduplicates requirements and constraints.
+        Concatenates and deduplicates requirements.
         Reduces configuration and variables (last key wins).
         """
         name = None

@@ -14,6 +14,7 @@ import os
 from logging import getLogger
 from os.path import abspath, basename, exists, isdir
 from pathlib import Path
+from tempfile import mktemp
 
 from boltons.setutils import IndexedSet
 
@@ -22,6 +23,7 @@ from ..base.constants import (
     REPODATA_FN,
     ROOT_ENV_NAME,
     UpdateModifier,
+    UNUSED_ENV_NAME,
 )
 from ..base.context import context
 from ..common.constants import NULL
@@ -36,6 +38,7 @@ from ..core.prefix_data import PrefixData
 from ..core.solve import diff_for_unlink_link_precs
 from ..deprecations import deprecated
 from ..exceptions import (
+    ArgumentError,
     CondaEnvException,
     CondaExitZero,
     CondaImportError,
@@ -44,6 +47,7 @@ from ..exceptions import (
     CondaValueError,
     DirectoryNotACondaEnvironmentError,
     DryRunExit,
+    NeedsNameOrPrefix,
     NoBaseEnvironmentError,
     PackageNotInstalledError,
     PackagesNotFoundError,
@@ -334,6 +338,53 @@ def install_clone(args, parser):
     )
 
 
+def _assemble_environment(
+    command: str,
+    name: str | None = None,
+    prefix: str | None = None,
+    specs: list[str] = (),
+    files: list[str] = (),
+    inject_default_packages: bool = True,  
+) -> Environment:
+    # TODO: check for explicit specs
+    # First, let's create an 'Environment' for the information exposed in the CLI (no files)
+    specs = [MatchSpec(pkg) for pkg in specs]
+    if command == "create" and inject_default_packages:
+        names = {spec.name for spec in specs}
+        for pkg in context.create_default_packages:
+            spec = MatchSpec(pkg)
+            if spec.name not in names:
+                specs.append(spec)
+
+    if command != "create" and not name and not prefix:
+        name = None
+        prefix = context.active_prefix
+    
+    cli_env = Environment(
+        name=name,
+        prefix=prefix,
+        requested_specs=specs,
+    )
+
+    # Now let's process potential files passed via --file
+    file_envs = []
+    if files:
+        for path in files:
+            spec_hook = context.plugin_manager.get_environment_specifiers(path)
+            file_envs.append(spec_hook.environment_spec(path))
+
+    try:
+        return Environment.merge(cli_env, *file_envs)
+    except NeedsNameOrPrefix:
+        if context.dry_run:
+            cli_env.prefix = os.path.join(mktemp(), UNUSED_ENV_NAME)
+            return Environment.merge(cli_env, *file_envs)
+        else:
+            raise ArgumentError(
+                "one of the arguments -n/--name -p/--prefix is required"
+            ) 
+
+
 def install(args, parser, command="install"):
     """Logic for `conda install`, `conda update`, `conda remove`, and `conda create`."""
     newenv = command == "create"
@@ -360,47 +411,19 @@ def install(args, parser, command="install"):
     if context.use_only_tar_bz2:
         args.repodata_fns = ("repodata.json",)
 
-    # collect packages provided from the command line
-    args_packages = [s.strip("\"'") for s in args.packages]
-    if newenv and not args.no_default_packages:
-        # Override defaults if they are specified at the command line
-        names = [MatchSpec(pkg).name for pkg in args_packages]
-        for default_package in context.create_default_packages:
-            if MatchSpec(default_package).name not in names:
-                args_packages.append(default_package)
-
-    num_cp = sum(is_package_file(s) for s in args_packages)
-    if num_cp:
-        if num_cp == len(args_packages):
-            # short circuit to installing explicit if all specs are direct files
-            explicit(args_packages, prefix, verbose=not context.quiet)
-            return
-        else:
-            raise CondaValueError(
-                "cannot mix specifications with conda package filenames"
-            )
-
-    # collect specs provided by --file arguments
-    specs = []
-    if args.file:
-        for fpath in args.file:
-            try:
-                specs.extend(common.specs_from_url(fpath, json=context.json))
-            except UnicodeError:
-                raise CondaError(
-                    "Error reading file, file should be a text file containing"
-                    " packages \nconda create --help for details"
-                )
-        if "@EXPLICIT" in specs:
-            # short circuit to installing explicit if explicit specs are provided
-            explicit(specs, prefix, verbose=not context.quiet)
-            return
-    specs.extend(common.specs_from_args(args_packages, json=context.json))
+    env = _assemble_environment(
+        command=command,
+        name=args.name,
+        prefix=args.prefix,
+        specs=args.packages,
+        files=args.file,
+        inject_default_packages=command == "create" and not args.no_default_packages,
+    )
 
     # for 'conda update', make sure the requested specs actually exist in the prefix
     # and that they are name-only specs
     if isupdate and context.update_modifier != UpdateModifier.UPDATE_ALL:
-        ensure_update_specs_exist(prefix=prefix, specs=specs)
+        ensure_update_specs_exist(prefix=prefix, specs=env.requested_specs)
 
     repodata_fns = args.repodata_fns
     if not repodata_fns:
@@ -433,7 +456,7 @@ def install(args, parser, command="install"):
                 prefix,
                 context_channels,
                 context.subdirs,
-                specs_to_add=specs,
+                specs_to_add=env.requested_specs,
                 repodata_fn=repodata,
                 command=args.cmd,
             )
