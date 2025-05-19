@@ -339,31 +339,36 @@ def install_clone(args, parser):
 
 
 def _assemble_environment(
-    command: str,
     name: str | None = None,
     prefix: str | None = None,
     specs: list[str] = (),
     files: list[str] = (),
     inject_default_packages: bool = True,  
 ) -> Environment:
-    # TODO: check for explicit specs
     # First, let's create an 'Environment' for the information exposed in the CLI (no files)
-    specs = [MatchSpec(pkg) for pkg in specs]
-    if command == "create" and inject_default_packages:
-        names = {spec.name for spec in specs}
+    if inject_default_packages:
+        names = {MatchSpec(pkg).name for pkg in specs}
         for pkg in context.create_default_packages:
-            spec = MatchSpec(pkg)
-            if spec.name not in names:
-                specs.append(spec)
+            pkg_name = MatchSpec(pkg).name
+            if pkg_name not in names:
+                specs.append(pkg_name)
 
-    if command != "create" and not name and not prefix:
-        name = None
-        prefix = context.active_prefix
-    
+    requested_specs = []
+    explicit_specs = []
+
+    for spec in specs:
+        if is_package_file(spec):
+            # TODO: this should be a matchspec? not doing that here just yet
+            # because of steps that happen after this.
+            explicit_specs.append(spec)
+        else:
+            requested_specs.append(common.arg2spec(spec, json=context.json))
+
     cli_env = Environment(
         name=name,
         prefix=prefix,
-        requested_specs=specs,
+        requested_specs=requested_specs,
+        explicit_specs=explicit_specs,
     )
 
     # Now let's process potential files passed via --file
@@ -374,15 +379,15 @@ def _assemble_environment(
             file_envs.append(spec_hook.environment_spec(path))
 
     try:
-        return Environment.merge(cli_env, *file_envs)
-    except NeedsNameOrPrefix:
         if context.dry_run:
             cli_env.prefix = os.path.join(mktemp(), UNUSED_ENV_NAME)
             return Environment.merge(cli_env, *file_envs)
         else:
-            raise ArgumentError(
-                "one of the arguments -n/--name -p/--prefix is required"
-            ) 
+            return Environment.merge(cli_env, *file_envs)
+    except NeedsNameOrPrefix:
+        raise ArgumentError(
+            "one of the arguments -n/--name -p/--prefix is required"
+        ) 
 
 
 def install(args, parser, command="install"):
@@ -412,10 +417,9 @@ def install(args, parser, command="install"):
         args.repodata_fns = ("repodata.json",)
 
     env = _assemble_environment(
-        command=command,
         name=args.name,
-        prefix=args.prefix,
-        specs=args.packages,
+        prefix=context.target_prefix,
+        specs=[s.strip("\"'") for s in args.packages],
         files=args.file,
         inject_default_packages=command == "create" and not args.no_default_packages,
     )
@@ -424,6 +428,11 @@ def install(args, parser, command="install"):
     # and that they are name-only specs
     if isupdate and context.update_modifier != UpdateModifier.UPDATE_ALL:
         ensure_update_specs_exist(prefix=prefix, specs=env.requested_specs)
+
+    # TODO: still need to move this around
+    # install explicit specs
+    if len(env.explicit_specs) > 0:
+        return explicit(env.explicit_specs, env.prefix, verbose=not context.quiet)
 
     repodata_fns = args.repodata_fns
     if not repodata_fns:

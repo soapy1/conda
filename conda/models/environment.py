@@ -8,7 +8,11 @@ from typing import Any
 
 from .match_spec import MatchSpec
 from ..base.context import context
-from ..exceptions import CondaError, NeedsNameOrPrefix
+from ..exceptions import (
+    CondaError,
+    CondaValueError,
+    NeedsNameOrPrefix,
+)
 
 
 log = getLogger(__name__)
@@ -37,6 +41,7 @@ class Environment:
     # current platform.
     platform: str = context.subdir
 
+    # TODO: find a better name
     # User requested specs for this environment.
     requested_specs: list[MatchSpec] = field(default_factory=list)
 
@@ -44,8 +49,15 @@ class Environment:
     variables: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self):
+        # an environment must have a name of prefix
         if not self.name and not self.prefix:
             raise NeedsNameOrPrefix("'Environment' needs either 'name' or 'prefix'.")
+
+        # an environment must not mix explicit_specs and requested_specs types
+        if len(self.explicit_specs) > 0 and len(self.requested_specs) > 0:
+            raise CondaValueError(
+                "cannot mix specifications with conda package filenames"
+            )
     
     @classmethod
     def merge(cls, *environments):
@@ -80,7 +92,8 @@ class Environment:
                     "Several prefixes passed %s. Picking first one %s", prefixes, prefix
                 )
         
-        if name and prefix and name != prefix.name and name != "base":
+        # TODO: fix this check
+        if name and prefix and not prefix.endswith(name) and name != "base":
             log.warning("Picked name %s and prefix %s do not match. Overriding prefix")
             prefix = None
 
