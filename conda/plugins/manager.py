@@ -525,38 +525,55 @@ class CondaPluginManager(pluggy.PluginManager):
         Raises EnvironmentSpecPluginNotDetected if no plugins were found.
         """
         hooks = self.get_hook_results("environment_specifiers")
-        found = []
-        for hook in hooks:
-            log.debug("EnvironmentSpec hook: checking %s", hook.name)
-            if hook.environment_spec(filename).can_handle():
-                log.debug(
-                    "EnvironmentSpec hook: %s can be %s",
-                    filename,
-                    hook.name,
-                )
-                found.append(hook)
+        
+        # if an env_spec_plugin is being explicitly requested for, look up
+        # that plugin. If it does not exist, return an error.
+        if context.env_spec_plugin != "":
+            found = [hook for hook in hooks if hook.name == context.env_spec_plugin]
+            if len(found) == 0:
+                raise EnvironmentSpecPluginNotDetected(f"No environment_spec plugin named {context.env_spec_plugin}")
+            elif len(found) > 1:
+                raise PluginError(f"More than one environment_spec plugin named {context.env_spec_plugin} found")
             else:
-                log.debug(
-                    "EnvironmentSpec hook: %s can NOT be handled by %s",
-                    filename,
-                    hook.name,
+                target_hook = found[0]
+                if not target_hook.environment_spec(filename).can_handle():
+                    log.warning("EnvironmentSpec hook: explicitly requested plugin '%s' can not handle input environment spec at '%s'", target_hook.name, filename)
+                return target_hook
+        else:
+            # if no env_spec_plugin is being explicitly requested for,
+            # try to detect the right plugin.
+            found = []
+            for hook in hooks:
+                log.debug("EnvironmentSpec hook: checking %s", hook.name)
+                if hook.environment_spec(filename).can_handle():
+                    log.debug(
+                        "EnvironmentSpec hook: %s can be %s",
+                        filename,
+                        hook.name,
+                    )
+                    found.append(hook)
+                else:
+                    log.debug(
+                        "EnvironmentSpec hook: %s can NOT be handled by %s",
+                        filename,
+                        hook.name,
+                    )
+
+            if len(found) == 1:
+                return found[0]
+            elif len(found) > 0:
+                # raise an error if there is more than one plugin found
+                raise PluginError(
+                    dals(
+                        f"""
+                        Too many plugins found that can handle the environment file '{filename}':
+
+                        {", ".join([hook.name for hook in found])}
+
+                        Please make sure that you don't have any overlapping plugins installed.
+                    """
+                    )
                 )
-
-        if len(found) == 1:
-            return found[0]
-        elif len(found) > 0:
-            # raise an error if there is more than one plugin found
-            raise PluginError(
-                dals(
-                    f"""
-                    Too many plugins found that can handle the environment file '{filename}':
-
-                    {", ".join([hook.name for hook in found])}
-
-                    Please make sure that you don't have any overlapping plugins installed.
-                """
-                )
-            )
 
         # raise error if no plugins found that can read the environment file
         raise EnvironmentSpecPluginNotDetected(
