@@ -17,11 +17,6 @@ class EnvironmentSpecPluginSpecifiers(BaseModel):
     version: str | None = None
 
 
-class EnvironmentEnvelop(BaseModel):
-    """An model representing an environment specification."""
-    plugin: EnvironmentSpecPluginSpecifiers
-
-
 class EnvironmentSpec(EnvironmentSpecBase):
     def __init__(self, source):
         self.source = expand(source)
@@ -46,11 +41,11 @@ class EnvironmentSpec(EnvironmentSpecBase):
             return False
         try:
             data = self.read_data()
-            plugin_specifier = EnvironmentEnvelop.model_validate_json(data)
-
-            if plugin_specifier.plugin.name != self.name():
+            plugin_specifier = self.model.model_validate_json(data)
+            # This requires the EnvironmentSpecPluginSpecifiers to always 
+            # be avilable at the "plugin" field :x
+            if plugin_specifier.plugin.name != self.name:
                 return False
-            
             # TODO: check version constraint?
         except Exception:
             return False

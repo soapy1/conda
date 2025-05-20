@@ -27,19 +27,10 @@ class MySimpleSpec(EnvironmentSpec):
     # fill in stuff like the plugin name, etc that will inform
     # some built in checks. This implementation, is pretty clucky
     # and I'm sure there is something better.
-    @staticmethod
-    def name() -> str:
-        """Returns the name of the environment spec plugin."""
-        return "mysimplespec"
+    name = "mysimplespec"
     
-    def is_file_supported(self):
-        # run built in checks
-        if not super().is_file_supported():
-            return False
-        
-        # run additional checks
-        return MySimpleEnvironment.model_validate_json(self.read_data())
-
+    model = MySimpleEnvironment
+    
     @property
     def environment(self) -> Environment:
         """Returns the Environment representation of the environment spec file"""
@@ -54,6 +45,6 @@ class MySimpleSpec(EnvironmentSpec):
 @hookimpl
 def conda_environment_specifiers():
     yield CondaEnvironmentSpecifier(
-        name=MySimpleSpec.name(),
+        name=MySimpleSpec.name,
         environment_spec=MySimpleSpec,
     )
