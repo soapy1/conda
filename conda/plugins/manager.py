@@ -508,7 +508,7 @@ class CondaPluginManager(pluggy.PluginManager):
         """
         return PluginConfig(data)
 
-    def get_environment_specifiers(self, filename: str) -> CondaEnvironmentSpecifier:
+    def get_environment_specifier(self, filename: str) -> CondaEnvironmentSpecifier:
         """
         Returns the environment_spec plugin that can handle the provided file.
 
