@@ -1,0 +1,7 @@
+{
+    "plugin": {
+        "name": "mysimplespec"
+    },
+    "name": "mysimplespec-test",
+    "conda_deps": ["numpy", "pandas"]
+}
