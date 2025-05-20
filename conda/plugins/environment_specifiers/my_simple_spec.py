@@ -10,8 +10,9 @@ from ...sdk.environment_spec.environment_spec import (
 
 
 class MySimpleEnvironment(BaseModel):
-    """An model representing an environment file."""
+    """An model representing a mysimple environment file."""
 
+    # not sure about how this composition should work
     plugin: EnvironmentSpecPluginSpecifiers
 
     # required
@@ -28,7 +29,7 @@ class MySimpleSpec(EnvironmentSpec):
     # some built in checks. This implementation, is pretty clucky
     # and I'm sure there is something better.
     name = "mysimplespec"
-    
+
     model = MySimpleEnvironment
     
     @property

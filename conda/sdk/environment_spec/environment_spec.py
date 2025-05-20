@@ -6,6 +6,7 @@ from ...common.path import expand
 from ...plugins.types import EnvironmentSpecBase
 
 
+# it would be neat to be able to provide some built in/reusable fields?
 class EnvironmentSpecPluginSpecifiers(BaseModel):
     """An model representing the metadata required to specify an environment spec."""
 
@@ -42,7 +43,7 @@ class EnvironmentSpec(EnvironmentSpecBase):
         try:
             data = self.read_data()
             plugin_specifier = self.model.model_validate_json(data)
-            # This requires the EnvironmentSpecPluginSpecifiers to always 
+            # TODO: this requires the EnvironmentSpecPluginSpecifiers to always 
             # be avilable at the "plugin" field :x
             if plugin_specifier.plugin.name != self.name:
                 return False
