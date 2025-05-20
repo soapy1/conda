@@ -419,6 +419,13 @@ class EnvironmentSpecBase(ABC):
     """
 
     @abstractmethod
+    def __init__(self, source, **kwargs):
+        """
+        A source (eg. file path) must be provided to instantiate an EnvironmentSpec
+        """
+        self.source = source
+
+    @abstractmethod
     def is_file_supported(self) -> bool:
         """
         Determines if the EnvSpec plugin can read and operate on the
