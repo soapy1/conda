@@ -28,7 +28,7 @@ deprecated.constant("24.7", "25.9", "ENVIRONMENT_TYPE", "env")
 class BinstarSpec(EnvironmentSpecBase):
     """
     spec = BinstarSpec('darth/deathstar')
-    spec.can_handle() # => True / False
+    spec.is_file_supported() # => True / False
     spec.environment # => YAML string
     spec.msg # => Error messages
     :raises: EnvironmentFileNotDownloaded
@@ -39,7 +39,7 @@ class BinstarSpec(EnvironmentSpecBase):
     def __init__(self, name=None):
         self.name = name
 
-    def can_handle(self) -> bool:
+    def is_file_supported(self) -> bool:
         """
         Validates loader can process environment definition.
         :return: True or False

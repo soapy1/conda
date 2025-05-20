@@ -28,7 +28,7 @@ def test_cannot_handle_file_path():
     assert spec.valid_name() is False
 
 
-def test_can_handle_binstar_name():
+def test_is_file_supported_binstar_name():
     spec = binstar.BinstarSpec("conda-test/test")
     assert spec.valid_name()
 

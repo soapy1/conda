@@ -419,7 +419,7 @@ class EnvironmentSpecBase(ABC):
     """
 
     @abstractmethod
-    def can_handle(self) -> bool:
+    def is_file_supported(self) -> bool:
         """
         Determines if the EnvSpec plugin can read and operate on the
         environment described by the `filename`.

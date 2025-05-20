@@ -642,7 +642,7 @@ class CondaSpecs:
                 def __init__(self, filename: str):
                     self.filename = filename
 
-                def can_handle(self):
+                def is_file_supported(self):
                     # Return early if no filename was provided
                     if self.filename is None:
                         return False

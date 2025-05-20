@@ -34,13 +34,13 @@ The first class we define is a subclass of :class:`~conda.plugins.types.Environm
 base class is an abstract base class which requires us to define our own implementations
 of its abstract methods:
 
-* ``can_handle`` Determines if the defined plugin can read and operate on the provided file.
+* ``is_file_supported`` Determines if the defined plugin can read and operate on the provided file.
 * ``environment`` Expresses the provided environment file as a conda environment object.
 
-Be sure to be very specific when implementing the ``can_handle`` method. It should only
-return a ``True`` if the file can be parsed by the plugin. Making the ``can_handle``
+Be sure to be very specific when implementing the ``is_file_supported`` method. It should only
+return a ``True`` if the file can be parsed by the plugin. Making the ``is_file_supported``
 method too permissive in the types of files it handles may lead to conflicts with other
-plugins. If multiple installed plugins are able to ``can_handle`` the same file type,
+plugins. If multiple installed plugins are able to ``is_file_supported`` the same file type,
 conda will return an error to the user.
 
 Registering the plugin hook
@@ -110,7 +110,7 @@ contain. In this example, a valid environment file is a ``.json`` file that defi
 
            return MySimpleEnvironment.model_validate_json(json_data)
 
-       def can_handle(self) -> bool:
+       def is_file_supported(self) -> bool:
            """
            Validates loader can process environment definition.
            This can handle if:

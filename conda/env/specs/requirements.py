@@ -49,7 +49,7 @@ class RequirementsSpec(EnvironmentSpecBase):
         else:
             return True
 
-    def can_handle(self) -> bool:
+    def is_file_supported(self) -> bool:
         """
         Validates loader can process environment definition.
         This can handle if:

@@ -19,7 +19,7 @@ class YamlFileSpec(EnvironmentSpecBase):
         self.filename = filename
         self.msg = None
 
-    def can_handle(self):
+    def is_file_supported(self):
         """
         Validates loader can process environment definition.
         This can handle if:
@@ -49,5 +49,5 @@ class YamlFileSpec(EnvironmentSpecBase):
     @property
     def environment(self):
         if not self._environment:
-            self.can_handle()
+            self.is_file_supported()
         return self._environment

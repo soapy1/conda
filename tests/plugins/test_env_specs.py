@@ -14,7 +14,7 @@ class RandomSpec(EnvironmentSpecBase):
     def __init__(self, filename: str):
         self.filename = filename
 
-    def can_handle(self):
+    def is_file_supported(self):
         for ext in RandomSpec.extensions:
             if self.filename.endswith(ext):
                 return True
