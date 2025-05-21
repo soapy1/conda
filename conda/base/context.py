@@ -1243,12 +1243,21 @@ class Context(Configuration):
     def environment_context_keys(self) -> list[str]:
         return [
             "auto_stack",
+            "aggressive_update_packages",
             "channel_priority",
             "channels",
             "channel_settings",
+            "custom_channels",
+            "custom_multichannels",
+            "default_channels",
+            "deps_modifier",
             "disallowed_packages",
             "pinned_packages",
-            "solver"
+            "repodata_fns",
+            "solver",
+            "track_features",
+            "update_modifier",
+            "use_only_tar_bz2",
         ]
     
     @property
