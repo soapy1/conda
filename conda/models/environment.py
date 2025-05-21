@@ -20,12 +20,12 @@ log = getLogger(__name__)
 
 @dataclass
 class Environment:
+    # Environment level configuration, eg. channels, solver options, etc.
+    config: dict[str, Any] = field(default_factory=dict)
+
     # Map of other package types that conda can install. For example pypi packages.
     # TODO: not sure if this is an ok way to capture this information
     external_packages: dict[str, list]  = field(default_factory=dict)
-
-    # Environment level configuration, eg. channels, solver options, etc.
-    environment_config: dict[str, Any] = field(default_factory=dict)
 
     # The complete list of specs for the environment.
     # eg. after a solve, or from an explicit environemnt spec
@@ -111,10 +111,10 @@ class Environment:
 
         variables = {k: v for env in environments for (k, v) in env.variables.items()}
         external_packages = {k: v for env in environments for (k, v) in env.external_packages.items()}
-        environment_config = {k: v for env in environments for (k, v) in env.environment_config.items()}
+        config = {k: v for env in environments for (k, v) in env.config.items()}
 
         return cls(
-            environment_config=environment_config,
+            config=config,
             external_packages= external_packages,
             explicit_specs=explicit_specs,
             name=name,

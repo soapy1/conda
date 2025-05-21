@@ -103,7 +103,7 @@ class YamlFileSpec(EnvironmentSpecBase):
             name=data.get("name"),
             prefix=data.get("prefix"),
             variables=data.get("variables"),
-            environment_config=env_config,
+            config=env_config,
         )
 
         specs = []
