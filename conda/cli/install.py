@@ -369,6 +369,7 @@ def _assemble_environment(
         prefix=prefix,
         requested_specs=requested_specs,
         explicit_specs=explicit_specs,
+        environment_config=context.environment_settings,
     )
 
     # Now let's process potential files passed via --file
