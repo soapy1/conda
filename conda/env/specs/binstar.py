@@ -38,6 +38,7 @@ class BinstarSpec(EnvironmentSpecBase):
 
     def __init__(self, name=None):
         self.name = name
+        super().__init__(name)
 
     def can_handle(self) -> bool:
         """

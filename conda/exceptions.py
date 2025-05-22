@@ -1381,3 +1381,7 @@ class InvalidInstaller(Exception):
 
 class OfflineError(CondaError, RuntimeError):
     pass
+
+
+class UnableToParseFile(CondaError):
+    pass

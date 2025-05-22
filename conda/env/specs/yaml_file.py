@@ -15,9 +15,9 @@ class YamlFileSpec(EnvironmentSpecBase):
     _environment = None
     extensions = {".yaml", ".yml"}
 
-    def __init__(self, filename=None, **kwargs):
-        self.filename = filename
-        self.msg = None
+    def __init__(self, source, **kwargs):
+        self.filename = source
+        super().__init__(source)
 
     def can_handle(self):
         """

@@ -23,6 +23,7 @@ class RequirementsSpec(EnvironmentSpecBase):
         self.filename = filename
         self._name = None
         self.msg = None
+        super().__init__(filename)
 
     @property
     @deprecated("25.9", "26.3", addendum="This attribute is not used anymore.")

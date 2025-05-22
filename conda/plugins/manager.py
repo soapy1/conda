@@ -26,6 +26,7 @@ from ..exceptions import (
     CondaValueError,
     EnvironmentSpecPluginNotDetected,
     PluginError,
+    UnableToParseFile,
 )
 from . import (
     environment_specifiers,
@@ -519,19 +520,22 @@ class CondaPluginManager(pluggy.PluginManager):
         found = []
         for hook in hooks:
             log.debug("EnvironmentSpec hook: checking %s", hook.name)
-            if hook.environment_spec(filename).can_handle():
-                log.debug(
-                    "EnvironmentSpec hook: %s can be %s",
-                    filename,
-                    hook.name,
-                )
-                found.append(hook)
-            else:
+            try:
+                hook.environment_spec(filename)
+            except UnableToParseFile:
                 log.debug(
                     "EnvironmentSpec hook: %s can NOT be handled by %s",
                     filename,
                     hook.name,
                 )
+                continue
+            
+            log.debug(
+                "EnvironmentSpec hook: %s can be %s",
+                filename,
+                hook.name,
+            )
+            found.append(hook)
 
         if len(found) == 1:
             return found[0]

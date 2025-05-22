@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 from requests.auth import AuthBase
 
+from ..exceptions import UnableToParseFile
 from ..models.records import PackageRecord
 
 if TYPE_CHECKING:
@@ -417,6 +418,11 @@ class EnvironmentSpecBase(ABC):
     """
     Base class for all env specs.
     """
+
+    def __init__(self, source, **kwargs):
+        self.source = source
+        if not self.can_handle():
+            raise UnableToParseFile("Can not handle the provided source")
 
     @abstractmethod
     def can_handle(self) -> bool:
