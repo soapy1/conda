@@ -33,6 +33,7 @@ from ..common.compat import NoneType, on_win
 from ..common.configuration import (
     Configuration,
     ConfigurationLoadError,
+    EnvironmentSpecificationRawParameter,
     MapParameter,
     ParameterLoader,
     PrimitiveParameter,
@@ -559,6 +560,13 @@ class Context(Configuration):
         )
         self._set_env_vars(APP_NAME)
         self._set_argparse_args(argparse_args)
+
+    def add_environment_file_config_source(self, file, data):
+        self._set_raw_data(
+            {
+                file: EnvironmentSpecificationRawParameter.make_raw_parameters(file, data)
+            }
+        )
 
     def post_build_validation(self) -> list[ValidationError]:
         errors = []

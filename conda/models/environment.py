@@ -74,11 +74,10 @@ class Environment:
         platforms = [env.platform for env in environments if env.platform]
 
         # Ensure that all environments have the same platform
-        if len(platforms) == len(set(platforms)):
+        if len(set(platforms)) == 1:
             platform = platforms[0]
         else:
-            # TODO: maybe a better thing to do here?
-            raise CondaError("Incompatible platforms")
+            raise CondaError("Multiple platforms found, please specify one")
         
         if names:
             name = names[0]

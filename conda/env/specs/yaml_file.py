@@ -102,7 +102,7 @@ class YamlFileSpec(EnvironmentSpecBase):
         env = Environment(
             name=data.get("name"),
             prefix=data.get("prefix"),
-            variables=data.get("variables"),
+            variables=data.get("variables", {}),
             config=env_config,
         )
 

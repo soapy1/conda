@@ -376,8 +376,12 @@ def _assemble_environment(
     file_envs = []
     if files:
         for path in files:
+            # parse the file
             spec_hook = context.plugin_manager.get_environment_specifiers(path)
-            file_envs.append(spec_hook.environment_spec(path))
+            file_env = spec_hook.environment_spec(path).environment
+            # add the config from the file to the context
+            context.add_environment_file_config_source(path, file_env.config)
+            file_envs.append(file_env)
 
     try:
         if context.dry_run:
