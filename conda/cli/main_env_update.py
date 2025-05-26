@@ -98,8 +98,7 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
     validate_file_exists(args.file)
 
     # detect the file format and get the env representation
-    spec = install_specs.detect(filename=args.file)
-    env = spec.environment
+    env = install_specs.detect(filename=args.file)
 
     if not (args.name or args.prefix):
         if not env.name:

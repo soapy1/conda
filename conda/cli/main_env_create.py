@@ -120,8 +120,7 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
     validate_file_exists(args.file)
 
     # detect the file format and get the env representation
-    spec = detect(filename=args.file)
-    env = spec.environment
+    env = detect(filename=args.file)
 
     # FIXME conda code currently requires args to have a name or prefix
     # don't overwrite name if it's given. gh-254

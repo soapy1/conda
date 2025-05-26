@@ -521,14 +521,14 @@ class CondaPluginManager(pluggy.PluginManager):
         for hook in hooks:
             log.debug("EnvironmentSpec hook: checking %s", hook.name)
             try:
-                hook.environment_spec().from_spec(filename)
+                hook.to_environment(filename)
                 log.debug(
                     "EnvironmentSpec hook: %s can be %s",
                     filename,
                     hook.name,
                 )
                 found.append(hook)
-            except EnvironmentSpecPluginCannotHandle as e:
+            except PluginError as e:
                 log.debug(
                     "EnvironmentSpec hook: %s can NOT be handled by %s",
                     filename,

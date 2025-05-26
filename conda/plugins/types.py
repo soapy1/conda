@@ -414,50 +414,6 @@ class CondaPrefixDataLoader:
     loader: CondaPrefixDataLoaderCallable
 
 
-class EnvironmentSpecBase(ABC):
-    """
-    Base class for all env specs.
-    """
-
-    @classmethod
-    def from_spec(cls, source: str):
-        """
-        Create an EnvironmentSpec from the given source.
-        """
-        env = cls(source)
-        if env.can_handle():
-            return env
-        raise EnvironmentSpecPluginCannotHandle("Plugin `{cls.__name__}` can not parse provided `{source}`")
-
-    @abstractmethod
-    def __init__(self, source, **kwargs):
-        """
-        Create an EnvironmentSpec.
-
-        :param source: A reference to the environment spec, for example full
-                       path to the environment file. 
-        """
-        raise NotImplementedError()
-    
-    @abstractmethod
-    def can_handle(self) -> bool:
-        """
-        Determines if the EnvSpec plugin can read and operate on the
-        environment described by the `filename`.
-        :returns bool: returns True, if the plugin can interpret the file.
-        """
-        raise NotImplementedError()
-    
-    @abstractmethod
-    def environment(self) -> Environment:
-        """
-        Express the provided environment file as a conda environment object.
-
-        :returns Environment: the conda environment represented by the file.
-        """
-        raise NotImplementedError()
-
-
 @dataclass
 class CondaEnvironmentSpecifier:
     """
@@ -471,4 +427,4 @@ class CondaEnvironmentSpecifier:
     """
 
     name: str
-    environment_spec: type[EnvironmentSpecBase]
+    to_environment: Callable[[str], Environment]

@@ -5,13 +5,12 @@
 import os
 from logging import getLogger
 
-from ...plugins.types import EnvironmentSpecBase
 from .. import env
 
 log = getLogger(__name__)
 
 
-class YamlFileSpec(EnvironmentSpecBase):
+class YamlFileSpec():
     _environment = None
     extensions = {".yaml", ".yml"}
 
