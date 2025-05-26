@@ -1294,6 +1294,8 @@ class SpecNotFound(CondaError):
 class PluginError(CondaError):
     pass
 
+class EnvironmentSpecPluginCannotHandle(PluginError):
+    pass
 
 def maybe_raise(error: BaseException, context: Context):
     if isinstance(error, CondaMultiError):

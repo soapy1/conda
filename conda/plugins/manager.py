@@ -39,6 +39,7 @@ from . import (
 from .config import PluginConfig
 from .hookspec import CondaSpecs, spec_name
 from .subcommands.doctor import health_checks
+from ..exceptions import EnvironmentSpecPluginCannotHandle
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -519,14 +520,15 @@ class CondaPluginManager(pluggy.PluginManager):
         found = []
         for hook in hooks:
             log.debug("EnvironmentSpec hook: checking %s", hook.name)
-            if hook.environment_spec(filename).can_handle():
+            try:
+                hook.environment_spec().from_spec(filename)
                 log.debug(
                     "EnvironmentSpec hook: %s can be %s",
                     filename,
                     hook.name,
                 )
                 found.append(hook)
-            else:
+            except EnvironmentSpecPluginCannotHandle as e:
                 log.debug(
                     "EnvironmentSpec hook: %s can NOT be handled by %s",
                     filename,
