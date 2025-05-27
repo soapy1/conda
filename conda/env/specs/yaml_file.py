@@ -12,12 +12,11 @@ log = getLogger(__name__)
 
 
 class YamlFileSpec(EnvironmentSpecBase):
-    _environment = None
+    _environment_yaml = None
     extensions = {".yaml", ".yml"}
 
     def __init__(self, filename=None, **kwargs):
         self.filename = filename
-        self.msg = None
 
     def can_handle(self):
         """
@@ -38,7 +37,7 @@ class YamlFileSpec(EnvironmentSpecBase):
             return False
 
         try:
-            self._environment = env.from_file(self.filename)
+            self._environment_yaml = env.from_file(self.filename)
             return True
         except Exception:
             log.debug(
@@ -48,6 +47,6 @@ class YamlFileSpec(EnvironmentSpecBase):
 
     @property
     def environment(self):
-        if not self._environment:
+        if not self._environment_yaml:
             self.can_handle()
-        return self._environment
+        return self._environment_yaml.to_environment_model()

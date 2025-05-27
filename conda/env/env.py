@@ -20,6 +20,7 @@ from ..gateways.connection.download import download_text
 from ..gateways.connection.session import CONDA_SESSION_SCHEMES
 from ..history import History
 from ..models.enums import PackageType
+from ..models.environment import Environment as EnvironmentModel
 from ..models.match_spec import MatchSpec
 from ..models.prefix_graph import PrefixGraph
 
@@ -259,6 +260,17 @@ class Environment:
         out = yaml_safe_dump(d, stream)
         if stream is None:
             return out
+
+    def to_environment_model(self):
+        return EnvironmentModel(
+            prefix = self.prefix,
+            platform = context.subdir,
+            name = self.name,
+            config={"channels": self.channels},
+            variables=self.variables,
+            requested_specs=self.dependencies.get("conda"),
+            external_packages={"pip": self.dependencies.get("pip")},
+        )
 
     def save(self):
         """Save the ``Environment`` data to a ``yaml`` file"""
