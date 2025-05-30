@@ -258,7 +258,8 @@ class ExplicitRequirementsSpec(RequirementsSpec):
             # Create an explicit environment with the packages
             # Using the typed ExplicitEnvironment class signals that this is from an explicit file
             # and should bypass the solver according to CEP-23
-            return ExplicitEnvironment(dependencies=packages, filename=self.filename)
+            explicit_env = ExplicitEnvironment(dependencies=packages, filename=self.filename)
+            return explicit_env.to_environment()
         except Exception as e:
             self.msg = f"Error creating environment from {self.filename}: {str(e)}"
             raise ValueError(self.msg) from e
