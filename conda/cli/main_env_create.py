@@ -138,7 +138,7 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
             raise CondaEnvException(msg)
         args.name = env.name
 
-    prefix = determine_target_prefix(context, args)
+    prefix = env.prefix
     prefix_data = PrefixData(prefix)
 
     if args.yes and not prefix_data.is_base() and prefix_data.exists():
@@ -176,13 +176,26 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
             installer = get_installer(installer_type)
             result[installer_type] = installer.install(prefix, args_packages, args, env)
 
-        if len(env.dependencies.items()) == 0:
+        if len(env.explicit_packages) == 0 and len(env.requested_packages) == 0:
+            # HACK: this is a really wacky way to handle this.
+            # Doing it to make things work for the demo.
             installer_type = "conda"
             pkg_specs = []
             installer = get_installer(installer_type)
             result[installer_type] = installer.install(prefix, pkg_specs, args, env)
         else:
-            for installer_type, pkg_specs in env.dependencies.items():
+            installer_type = "conda"
+            installer = get_installer(installer_type)
+            if len(env.explicit_packages) > 0:
+                result[installer_type] = installer.install(
+                    prefix, env.explicit_packages, args, env
+                )
+            if len(env.requested_packages) > 0:
+                result[installer_type] = installer.install(
+                    prefix, env.requested_packages, args, env
+                )
+            
+            for installer_type, pkg_specs in env.external_packages.items():
                 try:
                     installer = get_installer(installer_type)
                     result[installer_type] = installer.install(

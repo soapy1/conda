@@ -39,11 +39,12 @@ def _solve(
     :param env: Environment object
     :return: Solver object
     """
+    channels = env.config.get("channels", [])
     # TODO: support all various ways this happens
     # Including 'nodefaults' in the channels list disables the defaults
-    channel_urls = [chan for chan in env.channels if chan != "nodefaults"]
+    channel_urls = [chan for chan in channels if chan != "nodefaults"]
 
-    if "nodefaults" not in env.channels:
+    if "nodefaults" not in channels:
         channel_urls.extend(context.channels)
     _channel_priority_map = prioritize_channels(channel_urls)
 
