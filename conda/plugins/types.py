@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 from requests.auth import AuthBase
 
+from ..exceptions import CondaValueError
 from ..models.records import PackageRecord
 
 if TYPE_CHECKING:
@@ -417,6 +418,27 @@ class EnvironmentSpecBase(ABC):
     """
     Base class for all env specs.
     """
+
+    @classmethod
+    def from_spec(cls, source):
+        """
+        Create an EnvironmentSpec from the given source.
+
+        :param source: A reference to the environment spec
+        """
+        env_spec = cls(source)
+        if env_spec.can_handle():
+            return env_spec
+        raise CondaValueError(f"'{cls.__name__}' is unable to handle '{source}'")
+
+    def __init__(self, source: str):
+        """
+        Create an EnvironmentSpec.
+
+        :param source: A reference to the environment spec, for example full
+                       path to the environment file. 
+        """
+        self.source = source
 
     @abstractmethod
     def can_handle(self) -> bool:
