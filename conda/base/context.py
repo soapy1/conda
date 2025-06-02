@@ -225,7 +225,285 @@ def _warn_defaults_deprecation() -> None:
     )
 
 
-class Context(Configuration):
+class EnvironmentConfig(Configuration):
+    _aggressive_update_packages = ParameterLoader(
+        SequenceParameter(
+            PrimitiveParameter("", element_type=str), DEFAULT_AGGRESSIVE_UPDATE_PACKAGES
+        ),
+        aliases=("aggressive_update_packages",),
+    )
+
+    _use_only_tar_bz2 = ParameterLoader(
+        PrimitiveParameter(None, element_type=(bool, NoneType)),
+        aliases=("use_only_tar_bz2",),
+    )
+
+    create_default_packages = ParameterLoader(
+        SequenceParameter(PrimitiveParameter("", element_type=str))
+    )
+    pinned_packages = ParameterLoader(
+        SequenceParameter(
+            PrimitiveParameter("", element_type=str), string_delimiter="&"
+        )
+    )  # TODO: consider a different string delimiter
+
+    disallowed_packages = ParameterLoader(
+        SequenceParameter(
+            PrimitiveParameter("", element_type=str), string_delimiter="&"
+        ),
+        aliases=("disallow",),
+    )
+
+    repodata_fns = ParameterLoader(
+        SequenceParameter(
+            PrimitiveParameter("", element_type=str),
+            ("current_repodata.json", REPODATA_FN),
+        )
+    )
+
+    ####################################################
+    #               Solver Configuration               #
+    ####################################################
+    deps_modifier = ParameterLoader(PrimitiveParameter(DepsModifier.NOT_SET))
+    update_modifier = ParameterLoader(PrimitiveParameter(UpdateModifier.UPDATE_SPECS))
+    sat_solver = ParameterLoader(PrimitiveParameter(SatSolverChoice.PYCOSAT))
+    solver_ignore_timestamps = ParameterLoader(PrimitiveParameter(False))
+    solver = ParameterLoader(
+        PrimitiveParameter(DEFAULT_SOLVER),
+        aliases=("experimental_solver",),
+    )
+
+    ####################################################
+    #               Channel Configuration              #
+    ####################################################
+    allow_non_channel_urls = ParameterLoader(PrimitiveParameter(False))
+    _channel_alias = ParameterLoader(
+        PrimitiveParameter(DEFAULT_CHANNEL_ALIAS, validation=channel_alias_validation),
+        aliases=("channel_alias",),
+        expandvars=True,
+    )
+    channel_priority = ParameterLoader(PrimitiveParameter(ChannelPriority.FLEXIBLE))
+    _channels = ParameterLoader(
+        SequenceParameter(PrimitiveParameter("", element_type=str), default=()),
+        aliases=(
+            "channels",
+            "channel",
+        ),
+        expandvars=True,
+    )  # channel for args.channel
+    channel_settings = ParameterLoader(
+        SequenceParameter(MapParameter(PrimitiveParameter("", element_type=str)))
+    )
+    _custom_channels = ParameterLoader(
+        MapParameter(PrimitiveParameter("", element_type=str), DEFAULT_CUSTOM_CHANNELS),
+        aliases=("custom_channels",),
+        expandvars=True,
+    )
+    _custom_multichannels = ParameterLoader(
+        MapParameter(SequenceParameter(PrimitiveParameter("", element_type=str))),
+        aliases=("custom_multichannels",),
+        expandvars=True,
+    )
+    _default_channels = ParameterLoader(
+        SequenceParameter(PrimitiveParameter("", element_type=str), DEFAULT_CHANNELS),
+        aliases=("default_channels",),
+        expandvars=True,
+    )
+    _migrated_channel_aliases = ParameterLoader(
+        SequenceParameter(PrimitiveParameter("", element_type=str)),
+        aliases=("migrated_channel_aliases",),
+    )
+    migrated_custom_channels = ParameterLoader(
+        MapParameter(PrimitiveParameter("", element_type=str)), expandvars=True
+    )  # TODO: also take a list of strings
+    override_channels_enabled = ParameterLoader(PrimitiveParameter(True))
+    show_channel_urls = ParameterLoader(
+        PrimitiveParameter(None, element_type=(bool, NoneType))
+    )
+    use_local = ParameterLoader(PrimitiveParameter(False))
+    allowlist_channels = ParameterLoader(
+        SequenceParameter(PrimitiveParameter("", element_type=str)),
+        aliases=("whitelist_channels",),
+        expandvars=True,
+    )
+    denylist_channels = ParameterLoader(
+        SequenceParameter(PrimitiveParameter("", element_type=str)),
+        expandvars=True,
+    )
+    _restore_free_channel = ParameterLoader(
+        PrimitiveParameter(False),
+        aliases=("restore_free_channel",),
+    )
+
+    @property
+    def aggressive_update_packages(self) -> tuple[MatchSpec, ...]:
+        from ..models.match_spec import MatchSpec
+
+        return tuple(MatchSpec(s) for s in self._aggressive_update_packages)
+
+    @memoizedproperty
+    def channel_alias(self) -> Channel:
+        from ..models.channel import Channel
+
+        location, scheme, auth, token = split_scheme_auth_token(self._channel_alias)
+        return Channel(scheme=scheme, auth=auth, location=location, token=token)
+
+    @property
+    def migrated_channel_aliases(self) -> tuple[Channel, ...]:
+        from ..models.channel import Channel
+
+        return tuple(
+            Channel(scheme=scheme, auth=auth, location=location, token=token)
+            for location, scheme, auth, token in (
+                split_scheme_auth_token(c) for c in self._migrated_channel_aliases
+            )
+        )
+    
+    @memoizedproperty
+    def default_channels(self) -> list[Channel]:
+        # the format for 'default_channels' is a list of strings that either
+        #   - start with a scheme
+        #   - are meant to be prepended with channel_alias
+        return self.custom_multichannels[DEFAULTS_CHANNEL_NAME]
+    
+    @memoizedproperty
+    def custom_multichannels(self) -> dict[str, tuple[Channel, ...]]:
+        from ..models.channel import Channel
+
+        if (
+            not on_win
+            and self.subdir.startswith("win-")
+            and self._default_channels == DEFAULT_CHANNELS_UNIX
+        ):
+            default_channels = list(DEFAULT_CHANNELS_WIN)
+        else:
+            default_channels = list(self._default_channels)
+
+        if self._restore_free_channel:
+            deprecated.topic(
+                "24.9",
+                "25.9",
+                topic="Adding the 'free' channel using `restore_free_channel` config",
+                addendum="See "
+                "https://docs.conda.io/projects/conda/en/stable/user-guide/configuration/free-channel.html "
+                "for more details.",
+                deprecation_type=FutureWarning,
+            )
+            default_channels.insert(1, "https://repo.anaconda.com/pkgs/free")
+
+        reserved_multichannel_urls = {
+            DEFAULTS_CHANNEL_NAME: default_channels,
+            "local": self.conda_build_local_urls,
+        }
+        reserved_multichannels = {
+            name: tuple(
+                Channel.make_simple_channel(self.channel_alias, url) for url in urls
+            )
+            for name, urls in reserved_multichannel_urls.items()
+        }
+        custom_multichannels = {
+            name: tuple(
+                Channel.make_simple_channel(self.channel_alias, url) for url in urls
+            )
+            for name, urls in self._custom_multichannels.items()
+        }
+        return {
+            name: channels
+            for name, channels in (
+                *custom_multichannels.items(),
+                *reserved_multichannels.items(),  # order maters, reserved overrides custom
+            )
+        }
+
+    @memoizedproperty
+    def custom_channels(self) -> dict[str, Channel]:
+        from ..models.channel import Channel
+
+        return {
+            channel.name: channel
+            for channel in (
+                *chain.from_iterable(
+                    channel for channel in self.custom_multichannels.values()
+                ),
+                *(
+                    Channel.make_simple_channel(self.channel_alias, url, name)
+                    for name, url in self._custom_channels.items()
+                ),
+            )
+        }
+
+    @property
+    def channels(self) -> tuple[str, ...]:
+        local_channels = ("local",) if self.use_local else ()
+        argparse_args = dict(getattr(self, "_argparse_args", {}) or {})
+        # TODO: it's args.channel right now, not channels
+        cli_channels = argparse_args.get("channel") or ()
+
+        if argparse_args.get("override_channels"):
+            if not self.override_channels_enabled:
+                from ..exceptions import OperationNotAllowed
+
+                raise OperationNotAllowed("Overriding channels has been disabled.")
+
+            if cli_channels:
+                return validate_channels((*local_channels, *cli_channels))
+            else:
+                from ..exceptions import ArgumentError
+
+                raise ArgumentError(
+                    "At least one -c / --channel flag must be supplied when using "
+                    "--override-channels."
+                )
+
+        # add 'defaults' channel when necessary if --channel is given via the command line
+        if cli_channels:
+            # Add condition to make sure that we add the 'defaults'
+            # channel only when no channels are defined in condarc
+            # We need to get the config_files and then check that they
+            # don't define channels
+            channel_in_config_files = any(
+                "channels" in context.raw_data[rc_file] for rc_file in self.config_files
+            )
+            if cli_channels and not channel_in_config_files:
+                _warn_defaults_deprecation()
+                return validate_channels(
+                    (*local_channels, *cli_channels, DEFAULTS_CHANNEL_NAME)
+                )
+
+        if self._channels:
+            channels = self._channels
+        else:
+            _warn_defaults_deprecation()
+            channels = [DEFAULTS_CHANNEL_NAME]
+
+        return validate_channels((*local_channels, *channels))
+    
+    def solver_user_agent(self) -> str:
+        user_agent = f"solver/{self.solver}"
+        try:
+            solver_backend = self.plugin_manager.get_cached_solver_backend()
+            # Solver.user_agent has to be a static or class method
+            user_agent += f" {solver_backend.user_agent()}"
+        except Exception as exc:
+            log.debug(
+                "User agent could not be fetched from solver class '%s'.",
+                self.solver,
+                exc_info=exc,
+            )
+        return user_agent
+
+    @property
+    def use_only_tar_bz2(self) -> bool:
+        # we avoid importing this at the top to avoid PATH issues.  Ensure that this
+        #    is only called when use_only_tar_bz2 is first called.
+        import conda_package_handling.api
+
+        return (
+            not conda_package_handling.api.libarchive_enabled
+        ) or self._use_only_tar_bz2
+
+
+class Context(EnvironmentConfig, Configuration):
     add_pip_as_python_dependency = ParameterLoader(PrimitiveParameter(True))
     allow_conda_downgrades = ParameterLoader(PrimitiveParameter(False))
     # allow cyclical dependencies, or raise
@@ -245,9 +523,6 @@ class Context(Configuration):
     clobber = ParameterLoader(PrimitiveParameter(False))
     changeps1 = ParameterLoader(PrimitiveParameter(True))
     env_prompt = ParameterLoader(PrimitiveParameter("({default_env}) "))
-    create_default_packages = ParameterLoader(
-        SequenceParameter(PrimitiveParameter("", element_type=str))
-    )
     register_envs = ParameterLoader(PrimitiveParameter(True))
     protect_frozen_envs = ParameterLoader(PrimitiveParameter(True))
     default_python = ParameterLoader(
@@ -291,12 +566,6 @@ class Context(Configuration):
     )
 
     # Safety & Security
-    _aggressive_update_packages = ParameterLoader(
-        SequenceParameter(
-            PrimitiveParameter("", element_type=str), DEFAULT_AGGRESSIVE_UPDATE_PACKAGES
-        ),
-        aliases=("aggressive_update_packages",),
-    )
     safety_checks = ParameterLoader(PrimitiveParameter(SafetyChecks.warn))
     extra_safety_checks = ParameterLoader(PrimitiveParameter(False))
     _signing_metadata_url_base = ParameterLoader(
@@ -305,17 +574,6 @@ class Context(Configuration):
     )
     path_conflict = ParameterLoader(PrimitiveParameter(PathConflict.clobber))
 
-    pinned_packages = ParameterLoader(
-        SequenceParameter(
-            PrimitiveParameter("", element_type=str), string_delimiter="&"
-        )
-    )  # TODO: consider a different string delimiter
-    disallowed_packages = ParameterLoader(
-        SequenceParameter(
-            PrimitiveParameter("", element_type=str), string_delimiter="&"
-        ),
-        aliases=("disallow",),
-    )
     rollback_enabled = ParameterLoader(PrimitiveParameter(True))
     track_features = ParameterLoader(
         SequenceParameter(PrimitiveParameter("", element_type=str))
@@ -381,78 +639,6 @@ class Context(Configuration):
         PrimitiveParameter(True), aliases=("add_binstar_token",)
     )
 
-    ####################################################
-    #               Channel Configuration              #
-    ####################################################
-    allow_non_channel_urls = ParameterLoader(PrimitiveParameter(False))
-    _channel_alias = ParameterLoader(
-        PrimitiveParameter(DEFAULT_CHANNEL_ALIAS, validation=channel_alias_validation),
-        aliases=("channel_alias",),
-        expandvars=True,
-    )
-    channel_priority = ParameterLoader(PrimitiveParameter(ChannelPriority.FLEXIBLE))
-    _channels = ParameterLoader(
-        SequenceParameter(PrimitiveParameter("", element_type=str), default=()),
-        aliases=(
-            "channels",
-            "channel",
-        ),
-        expandvars=True,
-    )  # channel for args.channel
-    channel_settings = ParameterLoader(
-        SequenceParameter(MapParameter(PrimitiveParameter("", element_type=str)))
-    )
-    _custom_channels = ParameterLoader(
-        MapParameter(PrimitiveParameter("", element_type=str), DEFAULT_CUSTOM_CHANNELS),
-        aliases=("custom_channels",),
-        expandvars=True,
-    )
-    _custom_multichannels = ParameterLoader(
-        MapParameter(SequenceParameter(PrimitiveParameter("", element_type=str))),
-        aliases=("custom_multichannels",),
-        expandvars=True,
-    )
-    _default_channels = ParameterLoader(
-        SequenceParameter(PrimitiveParameter("", element_type=str), DEFAULT_CHANNELS),
-        aliases=("default_channels",),
-        expandvars=True,
-    )
-    _migrated_channel_aliases = ParameterLoader(
-        SequenceParameter(PrimitiveParameter("", element_type=str)),
-        aliases=("migrated_channel_aliases",),
-    )
-    migrated_custom_channels = ParameterLoader(
-        MapParameter(PrimitiveParameter("", element_type=str)), expandvars=True
-    )  # TODO: also take a list of strings
-    override_channels_enabled = ParameterLoader(PrimitiveParameter(True))
-    show_channel_urls = ParameterLoader(
-        PrimitiveParameter(None, element_type=(bool, NoneType))
-    )
-    use_local = ParameterLoader(PrimitiveParameter(False))
-    allowlist_channels = ParameterLoader(
-        SequenceParameter(PrimitiveParameter("", element_type=str)),
-        aliases=("whitelist_channels",),
-        expandvars=True,
-    )
-    denylist_channels = ParameterLoader(
-        SequenceParameter(PrimitiveParameter("", element_type=str)),
-        expandvars=True,
-    )
-    _restore_free_channel = ParameterLoader(
-        PrimitiveParameter(False),
-        aliases=("restore_free_channel",),
-    )
-    repodata_fns = ParameterLoader(
-        SequenceParameter(
-            PrimitiveParameter("", element_type=str),
-            ("current_repodata.json", REPODATA_FN),
-        )
-    )
-    _use_only_tar_bz2 = ParameterLoader(
-        PrimitiveParameter(None, element_type=(bool, NoneType)),
-        aliases=("use_only_tar_bz2",),
-    )
-
     always_softlink = ParameterLoader(PrimitiveParameter(False), aliases=("softlink",))
     always_copy = ParameterLoader(PrimitiveParameter(False), aliases=("copy",))
     always_yes = ParameterLoader(
@@ -495,18 +681,6 @@ class Context(Configuration):
     no_lock = ParameterLoader(PrimitiveParameter(False))
     repodata_use_zst = ParameterLoader(PrimitiveParameter(True))
     envvars_force_uppercase = ParameterLoader(PrimitiveParameter(True))
-
-    ####################################################
-    #               Solver Configuration               #
-    ####################################################
-    deps_modifier = ParameterLoader(PrimitiveParameter(DepsModifier.NOT_SET))
-    update_modifier = ParameterLoader(PrimitiveParameter(UpdateModifier.UPDATE_SPECS))
-    sat_solver = ParameterLoader(PrimitiveParameter(SatSolverChoice.PYCOSAT))
-    solver_ignore_timestamps = ParameterLoader(PrimitiveParameter(False))
-    solver = ParameterLoader(
-        PrimitiveParameter(DEFAULT_SOLVER),
-        aliases=("experimental_solver",),
-    )
 
     # # CLI-only
     # no_deps = ParameterLoader(PrimitiveParameter(NULL, element_type=(type(NULL), bool)))
@@ -806,12 +980,6 @@ class Context(Configuration):
         return int(os.getenv("CONDA_SHLVL", -1))
 
     @property
-    def aggressive_update_packages(self) -> tuple[MatchSpec, ...]:
-        from ..models.match_spec import MatchSpec
-
-        return tuple(MatchSpec(s) for s in self._aggressive_update_packages)
-
-    @property
     def target_prefix(self) -> PathType:
         # used for the prefix that is the target of the command currently being executed
         # different from the active prefix, which is sometimes given by -p or -n command line flags
@@ -878,37 +1046,12 @@ class Context(Configuration):
                 "CONDA_PYTHON_EXE": sys.executable,
             }
 
-    @memoizedproperty
-    def channel_alias(self) -> Channel:
-        from ..models.channel import Channel
-
-        location, scheme, auth, token = split_scheme_auth_token(self._channel_alias)
-        return Channel(scheme=scheme, auth=auth, location=location, token=token)
-
-    @property
-    def migrated_channel_aliases(self) -> tuple[Channel, ...]:
-        from ..models.channel import Channel
-
-        return tuple(
-            Channel(scheme=scheme, auth=auth, location=location, token=token)
-            for location, scheme, auth, token in (
-                split_scheme_auth_token(c) for c in self._migrated_channel_aliases
-            )
-        )
-
     @property
     def prefix_specified(self) -> bool:
         return (
             self._argparse_args.get("prefix") is not None
             or self._argparse_args.get("name") is not None
         )
-
-    @memoizedproperty
-    def default_channels(self) -> list[Channel]:
-        # the format for 'default_channels' is a list of strings that either
-        #   - start with a scheme
-        #   - are meant to be prepended with channel_alias
-        return self.custom_multichannels[DEFAULTS_CHANNEL_NAME]
 
     @property
     @deprecated(
@@ -921,118 +1064,6 @@ class Context(Configuration):
     def restore_free_channel(self) -> bool:
         return self._restore_free_channel
 
-    @memoizedproperty
-    def custom_multichannels(self) -> dict[str, tuple[Channel, ...]]:
-        from ..models.channel import Channel
-
-        if (
-            not on_win
-            and self.subdir.startswith("win-")
-            and self._default_channels == DEFAULT_CHANNELS_UNIX
-        ):
-            default_channels = list(DEFAULT_CHANNELS_WIN)
-        else:
-            default_channels = list(self._default_channels)
-
-        if self._restore_free_channel:
-            deprecated.topic(
-                "24.9",
-                "25.9",
-                topic="Adding the 'free' channel using `restore_free_channel` config",
-                addendum="See "
-                "https://docs.conda.io/projects/conda/en/stable/user-guide/configuration/free-channel.html "
-                "for more details.",
-                deprecation_type=FutureWarning,
-            )
-            default_channels.insert(1, "https://repo.anaconda.com/pkgs/free")
-
-        reserved_multichannel_urls = {
-            DEFAULTS_CHANNEL_NAME: default_channels,
-            "local": self.conda_build_local_urls,
-        }
-        reserved_multichannels = {
-            name: tuple(
-                Channel.make_simple_channel(self.channel_alias, url) for url in urls
-            )
-            for name, urls in reserved_multichannel_urls.items()
-        }
-        custom_multichannels = {
-            name: tuple(
-                Channel.make_simple_channel(self.channel_alias, url) for url in urls
-            )
-            for name, urls in self._custom_multichannels.items()
-        }
-        return {
-            name: channels
-            for name, channels in (
-                *custom_multichannels.items(),
-                *reserved_multichannels.items(),  # order maters, reserved overrides custom
-            )
-        }
-
-    @memoizedproperty
-    def custom_channels(self) -> dict[str, Channel]:
-        from ..models.channel import Channel
-
-        return {
-            channel.name: channel
-            for channel in (
-                *chain.from_iterable(
-                    channel for channel in self.custom_multichannels.values()
-                ),
-                *(
-                    Channel.make_simple_channel(self.channel_alias, url, name)
-                    for name, url in self._custom_channels.items()
-                ),
-            )
-        }
-
-    @property
-    def channels(self) -> tuple[str, ...]:
-        local_channels = ("local",) if self.use_local else ()
-        argparse_args = dict(getattr(self, "_argparse_args", {}) or {})
-        # TODO: it's args.channel right now, not channels
-        cli_channels = argparse_args.get("channel") or ()
-
-        if argparse_args.get("override_channels"):
-            if not self.override_channels_enabled:
-                from ..exceptions import OperationNotAllowed
-
-                raise OperationNotAllowed("Overriding channels has been disabled.")
-
-            if cli_channels:
-                return validate_channels((*local_channels, *cli_channels))
-            else:
-                from ..exceptions import ArgumentError
-
-                raise ArgumentError(
-                    "At least one -c / --channel flag must be supplied when using "
-                    "--override-channels."
-                )
-
-        # add 'defaults' channel when necessary if --channel is given via the command line
-        if cli_channels:
-            # Add condition to make sure that we add the 'defaults'
-            # channel only when no channels are defined in condarc
-            # We need to get the config_files and then check that they
-            # don't define channels
-            channel_in_config_files = any(
-                "channels" in context.raw_data[rc_file] for rc_file in self.config_files
-            )
-            if cli_channels and not channel_in_config_files:
-                _warn_defaults_deprecation()
-                return validate_channels(
-                    (*local_channels, *cli_channels, DEFAULTS_CHANNEL_NAME)
-                )
-
-        if self._channels:
-            channels = self._channels
-        else:
-            _warn_defaults_deprecation()
-            channels = [DEFAULTS_CHANNEL_NAME]
-
-        return validate_channels((*local_channels, *channels))
-
     @property
     def config_files(self) -> tuple[PathType, ...]:
         return tuple(
@@ -1040,16 +1071,6 @@ class Context(Configuration):
             for path in context.collect_all()
             if path not in ("envvars", "cmd_line")
         )
-
-    @property
-    def use_only_tar_bz2(self) -> bool:
-        # we avoid importing this at the top to avoid PATH issues.  Ensure that this
-        #    is only called when use_only_tar_bz2 is first called.
-        import conda_package_handling.api
-
-        return (
-            not conda_package_handling.api.libarchive_enabled
-        ) or self._use_only_tar_bz2
 
     @property
     def binstar_upload(self) -> bool | None:
@@ -1112,20 +1133,6 @@ class Context(Configuration):
             return logging.INFO  # 20
         else:
             return logging.WARNING  # 30
-
-    def solver_user_agent(self) -> str:
-        user_agent = f"solver/{self.solver}"
-        try:
-            solver_backend = self.plugin_manager.get_cached_solver_backend()
-            # Solver.user_agent has to be a static or class method
-            user_agent += f" {solver_backend.user_agent()}"
-        except Exception as exc:
-            log.debug(
-                "User agent could not be fetched from solver class '%s'.",
-                self.solver,
-                exc_info=exc,
-            )
-        return user_agent
 
     @memoizedproperty
     def user_agent(self) -> str:
