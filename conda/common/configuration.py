@@ -1473,6 +1473,34 @@ class Configuration(metaclass=ConfigurationType):
 
         self._reset_cache()
         return self
+    
+    def _set_dict_args(self, dict_args, source):
+        # the argparse_args we store internally in this class as self._argparse_args
+        #   will be a mapping type, not a non-`dict` object like argparse_args is natively
+        if hasattr(dict_args, "__dict__"):
+            # the argparse_args from argparse will be an object with a __dict__ attribute
+            #   and not a mapping type like this method will turn it into
+            items = vars(dict_args).items()
+        elif not dict_args:
+            # argparse_args can be initialized as `None`
+            items = ()
+        else:
+            # we're calling this method with argparse_args that are a mapping type, likely
+            #   already having been processed by this method before
+            items = dict_args.items()
+
+        self.dict_args = dict_args = AttrDict(
+            {k: v for k, v in items if v is not NULL}
+        )
+
+        # remove existing source so "insert" order is correct
+        if source in self.raw_data:
+            del self.raw_data[source]
+
+        self.raw_data[source] = ArgParseRawParameter.make_raw_parameters(dict_args)
+
+        self._reset_cache()
+        return self
 
     def _set_raw_data(self, raw_data: Mapping[Hashable, dict]):
         self.raw_data.update(raw_data)

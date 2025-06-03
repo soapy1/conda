@@ -3,6 +3,7 @@
 
 import pytest
 
+from conda.base.context import EnvironmentConfig
 from conda.exceptions import CondaValueError
 from conda.models.environment import Environment
 from conda.models.match_spec import MatchSpec
@@ -69,38 +70,33 @@ def test_environments_merge():
     env1 = Environment(
         prefix="/path/to/env1",
         platform="linux-64",
-        config={"primitive_one": "yes", "list_one": [1, 2, 4], "map": {"a": 1}},
         external_packages={
             "pip": ["one", "two", {"special": "type"}],
             "other": ["three"],
         },
-        explicit_packages=[],
         requested_packages=[MatchSpec("numpy"), MatchSpec("pandas")],
         variables={"PATH": "/usr/bin"},
     )
+    env1.config._set_dict_args(
+        {"use_only_tar_bz2":True, "repodata_fns":["repodata.json"]},
+        "env1",
+    )
+
     env2 = Environment(
         prefix="/path/to/env1",
         platform="linux-64",
-        config={
-            "primitive_one": "no",
-            "primitive_two": "yes",
-            "list_one": [3],
-            "map": {"b": 1},
-        },
         external_packages={"pip": ["two", "flask"], "a": ["nother"]},
-        explicit_packages=[],
         requested_packages=[MatchSpec("numpy"), MatchSpec("flask")],
         variables={"VAR": "IABLE"},
     )
+    env2.config._set_dict_args(
+        {"use_only_tar_bz2":False, "channels":("defaults", "other"), "repodata_fns":["repodata2.json"]},
+        "env2",
+    )
+
     merged = Environment.merge(env1, env2)
     assert merged.prefix == "/path/to/env1"
     assert merged.platform == "linux-64"
-    assert merged.config == {
-        "primitive_one": "no",
-        "primitive_two": "yes",
-        "list_one": [1, 2, 4, 3],
-        "map": {"a": 1, "b": 1},
-    }
     assert merged.external_packages == {
         "pip": ["one", "two", {"special": "type"}, "flask"],
         "other": ["three"],
@@ -110,6 +106,9 @@ def test_environments_merge():
         [MatchSpec("pandas"), MatchSpec("flask"), MatchSpec("numpy")]
     )
     assert merged.variables == {"PATH": "/usr/bin", "VAR": "IABLE"}
+    assert merged.config.use_only_tar_bz2 is False
+    assert merged.config.channels == ("defaults", "other")
+    assert merged.config.repodata_fns == ("repodata2.json", "repodata.json")
 
 
 def test_environments_merge_explicit_packages():
@@ -129,16 +128,20 @@ def test_environments_merge_explicit_packages():
         subdir="noarch",
         build_number=1,
     )
+
     env1 = Environment(
         prefix="/path/to/env1",
         platform="linux-64",
         explicit_packages=[somepackage],
     )
+    
+
     env2 = Environment(
         prefix="/path/to/env1",
         platform="linux-64",
         explicit_packages=[somepackage, somepackageother],
     )
+
     merged = Environment.merge(env1, env2)
     assert merged.prefix == "/path/to/env1"
     assert merged.platform == "linux-64"

@@ -9,6 +9,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 from ..base.constants import PLATFORMS
+from ..base.context import EnvironmentConfig
 from ..exceptions import CondaValueError
 
 if TYPE_CHECKING:
@@ -36,9 +37,7 @@ class Environment:
     platform: str
 
     #: Environment level configuration, eg. channels, solver options, etc.
-    #: TODO: may need to think more about the type of this field and how
-    #:       conda should be merging configs between environments
-    config: dict[str, Any] = field(default_factory=dict)
+    config: EnvironmentConfig = field(default_factory=EnvironmentConfig)
 
     #: Map of other package types that conda can install. For example pypi packages.
     external_packages: dict[str, list[str]] = field(default_factory=dict)
@@ -142,21 +141,10 @@ class Environment:
 
         variables = {k: v for env in environments for (k, v) in env.variables.items()}
 
-        config = {}
+        config = EnvironmentConfig()
         external_packages = {}
         for env in environments:
-            # Config items can be any type, merge them so that lists get
-            # concatenated, dicts get merged, and primitive types get clobbered.
-            for k, v in env.config.items():
-                if k not in config:
-                    config[k] = v
-                elif isinstance(config[k], list) and isinstance(v, list):
-                    config[k].extend(v)
-                elif isinstance(config[k], dict) and isinstance(v, dict):
-                    config[k].update(v)
-                else:
-                    log.debug("merging configs, clobbering value %s with value %s")
-                    config[k] = v
+            config._set_raw_data(env.config.raw_data)
 
             # External packages map values are always lists of strings. So,
             # we'll want to concatenate each list.
