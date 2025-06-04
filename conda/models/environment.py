@@ -35,37 +35,59 @@ class EnvironmentConfig:
     Data model for a conda environment config.
     """
 
-    aggressive_update_packages: bool
+    aggressive_update_packages: bool | None = None
 
-    channel_priority:  ChannelPriority
+    channel_priority:  ChannelPriority | None = None
 
-    channels: list[str]
+    channels: list[str]  = field(default_factory=list)
 
-    channel_settings: dict[str, str]
+    channel_settings: dict[str, str] = field(default_factory=dict)
 
-    deps_modifier: DepsModifier
+    deps_modifier: DepsModifier | None = None
 
-    disallowed_packages: list[str]
+    disallowed_packages: list[str] = field(default_factory=list)
 
-    pinned_packages: list[str]
+    pinned_packages: list[str] = field(default_factory=list)
 
-    repodata_fns: list[str]
+    repodata_fns: list[str] = field(default_factory=list)
 
-    solver: SatSolverChoice
+    solver: SatSolverChoice | None = None
 
-    track_features: list[str]
+    track_features: list[str] = field(default_factory=list)
 
-    update_modifier: UpdateModifier
+    update_modifier: UpdateModifier | None = None
 
-    use_only_tar_bz2: bool
+    use_only_tar_bz2: bool | None = None
 
     @classmethod
-    def merge(cls, *config):
+    def merge(cls, *configs):
         """
         **Experimental** While experimental, expect both major and minor changes across minor releases.
 
-        Merges multiple EnvironemntConfigs
+        Merges multiple EnvironemntConfigs. Merging rules are:
+        * Primitive types get clobbered
+        * Lists get appended to
+        * Dicts get updated
         """
+        result = cls()
+        for config in configs:
+            if config is None:
+                continue
+
+            result.aggressive_update_packages = config.aggressive_update_packages
+            result.channel_priority = config.channel_priority
+            result.channels.extend(config.channels)
+            result.channel_settings.update(config.channel_settings)
+            result.deps_modifier = config.deps_modifier
+            result.disallowed_packages.extend(config.disallowed_packages)
+            result.pinned_packages.extend(config.pinned_packages)
+            result.repodata_fns.extend(config.repodata_fns)
+            result.solver = config.solver
+            result.track_features.extend(config.track_features)
+            result.update_modifier = config.update_modifier
+            result.use_only_tar_bz2 = config.use_only_tar_bz2
+        
+        return result
 
 
 @dataclass
@@ -85,7 +107,7 @@ class Environment:
     #: Environment level configuration, eg. channels, solver options, etc.
     #: TODO: may need to think more about the type of this field and how
     #:       conda should be merging configs between environments
-    config: EnvironmentConfig
+    config: EnvironmentConfig | None = None
 
     #: Map of other package types that conda can install. For example pypi packages.
     external_packages: dict[str, list[str]] = field(default_factory=dict)
@@ -189,22 +211,8 @@ class Environment:
 
         variables = {k: v for env in environments for (k, v) in env.variables.items()}
 
-        config = {}
         external_packages = {}
         for env in environments:
-            # Config items can be any type, merge them so that lists get
-            # concatenated, dicts get merged, and primitive types get clobbered.
-            for k, v in env.config.items():
-                if k not in config:
-                    config[k] = v
-                elif isinstance(config[k], list) and isinstance(v, list):
-                    config[k].extend(v)
-                elif isinstance(config[k], dict) and isinstance(v, dict):
-                    config[k].update(v)
-                else:
-                    log.debug("merging configs, clobbering value %s with value %s")
-                    config[k] = v
-
             # External packages map values are always lists of strings. So,
             # we'll want to concatenate each list.
             for k, v in env.external_packages.items():
@@ -214,6 +222,8 @@ class Environment:
                             external_packages[k].append(val)
                 elif isinstance(v, list):
                     external_packages[k] = v
+
+        config = EnvironmentConfig.merge(*[env.config for env in environments])
 
         return cls(
             config=config,
