@@ -16,6 +16,7 @@ from .common.compat import on_mac, on_win, open_utf8
 from .common.io import dashlist
 from .common.path import expand
 from .common.url import is_url, join_url, path_to_url
+from .common.iterators import groupby_to_dict
 from .core.index import Index
 from .core.link import PrefixSetup, UnlinkLinkTransaction
 from .core.package_cache_data import PackageCacheData, ProgressiveFetchExtract
@@ -163,23 +164,29 @@ def _get_package_record_from_specs(specs: list[str]) -> Iterable[PackageCacheRec
     """Given a list of specs, find the corresponding PackageCacheRecord. If
     some PackageCacheRecords are missing, raise an error.
     """
-    specs_pcrecs = tuple(
-        [spec, next(PackageCacheData.query_all(spec), None)] for spec in specs
+    # group all specs with their package cache record together, and all specs without 
+    # a package cache record together. Will create a dict of the form:
+    # { True: [(spec, record), ...], False: [(spec, None), ...] } 
+    grouped_specs = groupby_to_dict(
+        lambda tup: tup[1] is not None,
+        tuple(
+            [spec, next(PackageCacheData.query_all(spec), None)] for spec in specs
+        ),
+
     )
 
+    existing = grouped_specs.get(True) or []
+    missing = grouped_specs.get(False) or []
+
     # Assert that every spec has a PackageCacheRecord
-    specs_with_missing_pcrecs = [
-        str(spec) for spec, pcrec in specs_pcrecs if pcrec is None
-    ]
-    if specs_with_missing_pcrecs:
-        if len(specs_with_missing_pcrecs) == len(specs_pcrecs):
-            raise SpecNotFoundInPackageCache("No package cache records found")
-        else:
-            missing_precs_list = ", ".join(specs_with_missing_pcrecs)
-            raise SpecNotFoundInPackageCache(
-                f"Missing package cache records for: {missing_precs_list}"
-            )
-    return [rec[1] for rec in specs_pcrecs]
+    if missing and not existing:
+        raise SpecNotFoundInPackageCache("No package cache records found")
+    elif missing:
+        missing_precs_list = ", ".join([str(tup[0]) for tup in missing])
+        raise SpecNotFoundInPackageCache(
+            f"Missing package cache records for: {missing_precs_list}"
+        )
+    return [tup[1] for tup in existing]
 
 
 def get_package_records_from_explicit(lines: list[str]) -> Iterable[PackageCacheRecord]:
