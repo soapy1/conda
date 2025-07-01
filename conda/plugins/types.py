@@ -427,6 +427,9 @@ class EnvironmentSpecBase(ABC):
     # autodetection is enabled.
     detection_supported: ClassVar[bool] = True
 
+    def __init__(self, source):
+        self.source = source
+
     @abstractmethod
     def can_handle(self) -> bool:
         """
@@ -447,6 +450,11 @@ class EnvironmentSpecBase(ABC):
         """
         raise NotImplementedError()
 
+    def get_environment(self):
+        if hasattr(self, "environment_model"):
+            return self.environment_model
+        else:
+            return self.environment_model
 
 @dataclass
 class CondaEnvironmentSpecifier:

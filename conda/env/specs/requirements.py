@@ -10,15 +10,12 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from typing import ClassVar
 
-from ...base.context import context
 from ...deprecations import deprecated
 from ...gateways.disk.read import yield_lines
-from ...models.environment import Environment
-from ...models.match_spec import MatchSpec
-from ...plugins.types import EnvironmentSpecBase
+from ..env import Environment
 
 
-class RequirementsSpec(EnvironmentSpecBase):
+class RequirementsSpec:
     """
     Reads dependencies from requirements files (including explicit files)
     and returns an Environment object from it.
@@ -103,22 +100,12 @@ class RequirementsSpec(EnvironmentSpecBase):
         return True
 
     @property
-    def environment(self) -> Environment:
-        """
-        Build an environment from the requirements file.
-
-        :return: An Environment object containing the package specifications
-        :raises ValueError: If the file cannot be read
-        """
-        if not self.filename:
-            raise ValueError("No filename provided")
-
-        # Convert generator to list since Dependencies needs to access it multiple times
-        dependencies_list = list(yield_lines(self.filename))
-        requested_packages = [MatchSpec(dep) for dep in dependencies_list]
-
-        return Environment(
-            prefix=context.target_prefix,
-            platform=context.subdir,
-            requested_packages=requested_packages,
-        )
+    def environment(self):
+        dependencies = []
+        with open(self.filename) as reqfile:
+            for line in reqfile:
+                line = line.strip()
+                if not line or line.startswith("#"):
+                    continue
+                dependencies.append(line)
+        return Environment(name=self.name, dependencies=dependencies)
