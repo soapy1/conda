@@ -24,6 +24,7 @@ from ..base.constants import (
     REPODATA_FN,
     ROOT_ENV_NAME,
     UNUSED_ENV_NAME,
+    DepsModifier,
     UpdateModifier,
 )
 from ..base.context import context
@@ -387,62 +388,21 @@ def _assemble_environment(
     return Environment.merge(cli_env, *file_envs)
 
 
-def update(args: Namespace):
-    """Logic for `conda update`."""
-    prefix = context.target_prefix
-
-    # common validations for all types of installs
-    validate_install_command(prefix=prefix, command="update")
-
-    if context.use_only_tar_bz2:
-        args.repodata_fns = ("repodata.json",)
-
-    # collect packages provided from the command line
-    args_packages = [s.strip("\"'") for s in args.packages]
-     # collect specs provided by --file arguments
-    specs = []
-    if args.file:
-        for fpath in args.file:
-            try:
-                specs.extend(common.specs_from_url(fpath, json=context.json))
-            except UnicodeError:
-                raise CondaError(
-                    "Error reading file, file should be a text file containing"
-                    " packages \nconda update --help for details"
-                )
-        if "@EXPLICIT" in specs:
-            # short circuit to installing explicit if explicit specs are provided
-            raise CondaError(
-                "Cannot update packages from an explicit file. Please try"
-                "\n`conda install` instead"
-            )
-    specs.extend(common.specs_from_args(args_packages, json=context.json))
-
-    # make sure the requested specs actually exist in the prefix
-    # and that they are name-only specs
-    if context.update_modifier != UpdateModifier.UPDATE_ALL:
-        ensure_update_specs_exist(prefix=prefix, specs=specs)
-
-    repodata_fns = args.repodata_fns
-    if not repodata_fns:
-        repodata_fns = list(context.repodata_fns)
-    if REPODATA_FN not in repodata_fns:
-        repodata_fns.append(REPODATA_FN)
-
-
-    args_set_update_modifier = getattr(args, "update_modifier", NULL) != NULL
+def retry_solve_for_transaction(
+        prefix: str,
+        specs: list[MatchSpec],
+        repodata_fns: list[str], 
+        args_update_modifier: UpdateModifier,
+        index_args: dict[str, any],
+        channels: list[str] = context.channels,
+        update_modifier: UpdateModifier = context.update_modifier,
+        deps_modifier: DepsModifier  = context.deps_modifier,
+    ):
     # This helps us differentiate between an update, the --freeze-installed option, and the retry
     # behavior in our initial fast frozen solve
     _should_retry_unfrozen = (
-        not args_set_update_modifier
-        or args.update_modifier
-        not in (UpdateModifier.FREEZE_INSTALLED, UpdateModifier.UPDATE_SPECS)
+        args_update_modifier not in (UpdateModifier.FREEZE_INSTALLED, UpdateModifier.UPDATE_SPECS)
     )
-
-    update_modifier = context.update_modifier
-    deps_modifier = context.deps_modifier
-    index_args = get_index_args(args=args)
-    context_channels = context.channels
 
     for repodata_fn in Repodatas(
         repodata_fns,
@@ -453,7 +413,7 @@ def update(args: Namespace):
             solver_backend = context.plugin_manager.get_cached_solver_backend()
             solver = solver_backend(
                 prefix,
-                context_channels,
+                channels,
                 context.subdirs,
                 specs_to_add=specs,
                 repodata_fn=repodata,
@@ -486,7 +446,57 @@ def update(args: Namespace):
                 if e.args and "could not import" in e.args[0]:
                     raise CondaImportError(str(e))
                 raise e
+    return unlink_link_transaction
 
+
+def update(args: Namespace):
+    """Logic for `conda update`."""
+    prefix = context.target_prefix
+
+    # common validations for all types of installs
+    validate_install_command(prefix=prefix, command="update")
+
+    if context.use_only_tar_bz2:
+        args.repodata_fns = ("repodata.json",)
+
+    # collect packages provided from the command line
+    args_packages = [s.strip("\"'") for s in args.packages]
+    # collect specs provided by --file arguments
+    specs = []
+    if args.file:
+        for fpath in args.file:
+            try:
+                specs.extend(common.specs_from_url(fpath, json=context.json))
+            except UnicodeError:
+                raise CondaError(
+                    "Error reading file, file should be a text file containing"
+                    " packages \nconda update --help for details"
+                )
+        if "@EXPLICIT" in specs:
+            # short circuit to installing explicit if explicit specs are provided
+            raise CondaError(
+                "Cannot update packages from an explicit file. Please try"
+                "\n`conda install` instead"
+            )
+    specs.extend(common.specs_from_args(args_packages, json=context.json))
+
+    # make sure the requested specs actually exist in the prefix
+    # and that they are name-only specs
+    if context.update_modifier != UpdateModifier.UPDATE_ALL:
+        ensure_update_specs_exist(prefix=prefix, specs=specs)
+
+    repodata_fns = args.repodata_fns
+    if not repodata_fns:
+        repodata_fns = list(context.repodata_fns)
+    if REPODATA_FN not in repodata_fns:
+        repodata_fns.append(REPODATA_FN)
+
+    unlink_link_transaction = retry_solve_for_transaction(
+        prefix=prefix,
+        specs=specs,
+        repodata_fns=repodata_fns,
+        args_update_modifier=getattr(args, "update_modifier", NULL),
+    )
     handle_txn(unlink_link_transaction, prefix, args, newenv=False)
 
 
@@ -515,8 +525,6 @@ def install(args, parser, command="install"):
         return update(args)
 
     prefix = context.target_prefix
-    index_args = get_index_args(args=args)
-    context_channels = context.channels
 
     # common validations for all types of installs
     validate_install_command(prefix=prefix, command=command)
@@ -542,62 +550,20 @@ def install(args, parser, command="install"):
     if REPODATA_FN not in repodata_fns:
         repodata_fns.append(REPODATA_FN)
 
-    args_set_update_modifier = getattr(args, "update_modifier", NULL) != NULL
-    # This helps us differentiate between an update, the --freeze-installed option, and the retry
-    # behavior in our initial fast frozen solve
-    _should_retry_unfrozen = (
-        not args_set_update_modifier
-        or args.update_modifier
-        not in (UpdateModifier.FREEZE_INSTALLED, UpdateModifier.UPDATE_SPECS)
-    ) and not newenv
-
     update_modifier = env.config.update_modifier
     if isinstall and args.update_modifier == NULL:
         update_modifier = UpdateModifier.FREEZE_INSTALLED
     deps_modifier = env.config.deps_modifier
 
-    for repodata_fn in Repodatas(
-        repodata_fns,
-        index_args,
-        (UnsatisfiableError, SpecsConfigurationConflictError, SystemExit),
-    ):
-        with repodata_fn as repodata:
-            solver_backend = context.plugin_manager.get_cached_solver_backend()
-            solver = solver_backend(
-                prefix,
-                context_channels,
-                context.subdirs,
-                specs_to_add=env.requested_packages,
-                repodata_fn=repodata,
-                command=args.cmd,
-            )
-            try:
-                unlink_link_transaction = solver.solve_for_transaction(
-                    deps_modifier=deps_modifier,
-                    update_modifier=update_modifier,
-                    force_reinstall=context.force_reinstall or context.force,
-                    should_retry_solve=(
-                        _should_retry_unfrozen or repodata != repodata_fns[-1]
-                    ),
-                )
-            except (UnsatisfiableError, SpecsConfigurationConflictError) as e:
-                if not getattr(e, "allow_retry", True):
-                    raise e
-                if _should_retry_unfrozen:
-                    unlink_link_transaction = solver.solve_for_transaction(
-                        deps_modifier=deps_modifier,
-                        update_modifier=UpdateModifier.UPDATE_SPECS,
-                        force_reinstall=context.force_reinstall or context.force,
-                        should_retry_solve=(repodata != repodata_fns[-1]),
-                    )
-                else:
-                    raise e
-            except SystemExit as e:
-                if not getattr(e, "allow_retry", True):
-                    raise e
-                if e.args and "could not import" in e.args[0]:
-                    raise CondaImportError(str(e))
-                raise e
+    unlink_link_transaction = retry_solve_for_transaction(
+        prefix=prefix,
+        specs=env.requested_packages,
+        repodata_fns=repodata_fns,
+        args_update_modifier=getattr(args, "update_modifier", NULL),
+        channels=env.config.channels,
+        update_modifier=update_modifier,
+        deps_modifier=deps_modifier,
+    )
 
     handle_txn(unlink_link_transaction, prefix, args, newenv)
 
