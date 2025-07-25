@@ -419,7 +419,7 @@ def add_parser_prune(p: ArgumentParser) -> None:
         "--prune",
         action="store_true",
         default=NULL,
-        help=SUPPRESS,
+        help="Remove packages that are not specified in the current running command",
     )
 
 

@@ -471,6 +471,7 @@ def install(args, parser, command="install"):
                     should_retry_solve=(
                         _should_retry_unfrozen or repodata != repodata_fns[-1]
                     ),
+                    prune=args.prune
                 )
             except (UnsatisfiableError, SpecsConfigurationConflictError) as e:
                 if not getattr(e, "allow_retry", True):
