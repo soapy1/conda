@@ -23,7 +23,6 @@ def configure_parser(sub_parsers: _SubParsersAction, **kwargs) -> ArgumentParser
         add_parser_frozen_env,
         add_parser_networking,
         add_parser_prefix,
-        add_parser_prune,
         add_parser_pscheck,
         add_parser_solver,
     )
@@ -102,7 +101,6 @@ def configure_parser(sub_parsers: _SubParsersAction, **kwargs) -> ArgumentParser
         "These pinned packages might come from a .condarc file or a file in "
         "<TARGET_ENVIRONMENT>/conda-meta/pinned.",
     )
-    add_parser_prune(solver_mode_options)
     add_parser_solver(solver_mode_options)
 
     add_parser_networking(p)
