@@ -363,6 +363,13 @@ def _assemble_environment(
                 "cannot mix specifications with conda package filenames"
             )
 
+    # config precedence for building an environment goes,
+    # from lowest to highest priority:
+    # - config files (from context)
+    # - $condarc files (from context)
+    # - env vars (from context)
+    # - env files
+    # - cli args (from context)
     cli_env = Environment(
         name=name,
         prefix=prefix,
