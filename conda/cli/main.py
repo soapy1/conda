@@ -26,6 +26,7 @@ def main_subshell(*args, post_parse_hook=None, **kwargs):
     """Entrypoint for the "subshell" invocation of CLI interface. E.g. `conda create`."""
     # defer import here so it doesn't hit the 'conda shell.*' subcommands paths
     from ..base.context import context
+    from ..base.constants import SEARCH_PATH
     from .conda_argparse import do_call, generate_parser, generate_pre_parser
 
     args = args or ["--help"]
@@ -41,17 +42,17 @@ def main_subshell(*args, post_parse_hook=None, **kwargs):
         "verbosity": pre_args.verbosity,
     }
 
-    context.__init__(argparse_args=pre_args)
+    context.__init__(search_path=SEARCH_PATH, argparse_args=pre_args)
     if context.no_plugins:
         context.plugin_manager.disable_external_plugins()
 
     # reinitialize in case any of the entrypoints modified the context
-    context.__init__(argparse_args=pre_args)
+    context.__init__(search_path=SEARCH_PATH, argparse_args=pre_args)
 
     parser = generate_parser(add_help=True)
     args = parser.parse_args(args, override_args=override_args, namespace=pre_args)
 
-    context.__init__(argparse_args=args)
+    context.__init__(search_path=SEARCH_PATH, argparse_args=args)
     init_loggers()
 
     # used with main_pip.py
