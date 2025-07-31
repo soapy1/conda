@@ -70,6 +70,7 @@ from .common import check_non_admin
 from .main_config import set_keys
 
 if TYPE_CHECKING:
+    from argparse import Namespace
     from collections.abc import Iterable
 
 log = getLogger(__name__)
@@ -333,6 +334,7 @@ def _assemble_environment(
     specs: Iterable[str] = (),
     files: Iterable[str] = (),
     inject_default_packages: bool = True,
+    cli_args: Namespace | None = None,
 ) -> Environment:
     # First, let's create an 'Environment' for the information exposed in the CLI (no files)
     if inject_default_packages:
@@ -376,6 +378,14 @@ def _assemble_environment(
         platform=context.subdir,
         requested_packages=requested_packages,
         explicit_packages=explicit_packages,
+        config=EnvironmentConfig.from_cli_args(cli_args),
+    )
+
+    # Build an env with config taken from the context
+    context_env = Environment(
+        name=name,
+        prefix=prefix,
+        platform=context.subdir,
         config=EnvironmentConfig.from_context(),
     )
 
@@ -390,7 +400,7 @@ def _assemble_environment(
     if context.dry_run:
         cli_env.prefix = os.path.join(mktemp(), UNUSED_ENV_NAME)
 
-    return Environment.merge(cli_env, *file_envs)
+    return Environment.merge(cli_env, *file_envs, context_env)
 
 
 def install(args, parser, command="install"):
@@ -424,7 +434,10 @@ def install(args, parser, command="install"):
         specs=[s.strip("\"'") for s in args.packages],
         files=args.file,
         inject_default_packages=command == "create" and not args.no_default_packages,
+        cli_args=args,
     )
+
+    import pdb; pdb.set_trace()
 
     # install explicit specs
     if len(env.explicit_packages) > 0 and len(env.requested_packages) == 0:

@@ -10,6 +10,7 @@ from itertools import chain
 from logging import getLogger
 from typing import TYPE_CHECKING
 
+from ..auxlib import NULL
 from ..base.constants import PLATFORMS, UNKNOWN_CHANNEL
 from ..base.context import context
 from ..common.iterators import groupby_to_dict as groupby
@@ -19,6 +20,7 @@ from ..history import History
 from .match_spec import MatchSpec
 
 if TYPE_CHECKING:
+    from argparse import Namespace
     from collections.abc import Iterable
     from typing import TypeVar
 
@@ -172,6 +174,31 @@ class EnvironmentConfig:
             key: value
             for key, value in context.environment_settings.items()
             if key in field_names
+        }
+        return cls(**environment_settings)
+    
+    @classmethod
+    def from_cli_args(cls, cli_args: Namespace | None) -> EnvironmentConfig:
+        """
+        **Experimental** While experimental, expect both major and minor changes across minor releases.
+
+        Create an EnvironmentConfig from cli args
+        """
+        cli_args_to_settings = {
+            "channel": "channels",
+            "repodata_fns": "repodata_fns",
+            "channel_priority": "channel_priority",
+            "deps_modifier": "deps_modifier",
+            "solver": "solver",
+        }
+        if cli_args is None:
+            return cls()
+        
+        environment_settings = {
+            cli_args_to_settings[key]: value
+            for key, value in vars(cli_args).items()
+            # TODO: Not sure if this should filter out None values
+            if key in cli_args_to_settings.keys() and (value is not NULL and value is not None)
         }
         return cls(**environment_settings)
 
