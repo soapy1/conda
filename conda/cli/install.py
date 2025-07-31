@@ -26,7 +26,7 @@ from ..base.constants import (
     UNUSED_ENV_NAME,
     UpdateModifier,
 )
-from ..base.context import context
+from ..base.context import context, fresh_context
 from ..common.constants import NULL
 from ..common.path import is_package_file
 from ..core.index import (
@@ -71,6 +71,7 @@ from .main_config import set_keys
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+    from argparse import Namespace
 
 log = getLogger(__name__)
 stderrlog = getLogger("conda.stderr")
@@ -333,6 +334,7 @@ def _assemble_environment(
     specs: Iterable[str] = (),
     files: Iterable[str] = (),
     inject_default_packages: bool = True,
+    cli_args: Namespace | None = None,
 ) -> Environment:
     # First, let's create an 'Environment' for the information exposed in the CLI (no files)
     if inject_default_packages:
@@ -363,12 +365,26 @@ def _assemble_environment(
                 "cannot mix specifications with conda package filenames"
             )
 
-    cli_env = Environment(
+    with fresh_context(env=os.environ, search_path=None, argparse_args=cli_args) as ctx:
+        cli_env = Environment(
+            name=name,
+            prefix=prefix,
+            platform=context.subdir,
+            requested_packages=requested_packages,
+            explicit_packages=explicit_packages,
+            config=EnvironmentConfig.from_context(),
+        )
+
+
+    # Generate environment model from the empty environment.
+    # This is important for collecting the configuration from the 
+    # conda config files. The config coming from the environment 
+    # specs have lower precedence than cli args, and higher precedence
+    # than config files.
+    context_env = Environment(
         name=name,
         prefix=prefix,
         platform=context.subdir,
-        requested_packages=requested_packages,
-        explicit_packages=explicit_packages,
         config=EnvironmentConfig.from_context(),
     )
 
@@ -380,10 +396,9 @@ def _assemble_environment(
         file_env = spec_hook.environment_spec(path).env
         file_envs.append(file_env)
 
-    if context.dry_run:
-        cli_env.prefix = os.path.join(mktemp(), UNUSED_ENV_NAME)
-
-    return Environment.merge(cli_env, *file_envs)
+    # Merge all the environments. Cli has the highest precedence, then files,
+    # then the environment coming from the context
+    return Environment.merge(cli_env, *file_envs, context_env)
 
 
 def install(args, parser, command="install"):
@@ -403,7 +418,6 @@ def install(args, parser, command="install"):
 
     prefix = context.target_prefix
     index_args = get_index_args(args=args)
-    context_channels = context.channels
 
     # common validations for all types of installs
     validate_install_command(prefix=prefix, command=command)
@@ -417,6 +431,7 @@ def install(args, parser, command="install"):
         specs=[s.strip("\"'") for s in args.packages],
         files=args.file,
         inject_default_packages=command == "create" and not args.no_default_packages,
+        cli_args=args,
     )
 
     # install explicit specs
@@ -457,7 +472,7 @@ def install(args, parser, command="install"):
             solver_backend = context.plugin_manager.get_cached_solver_backend()
             solver = solver_backend(
                 prefix,
-                context_channels,
+                env.config.channels,
                 context.subdirs,
                 specs_to_add=env.requested_packages,
                 repodata_fn=repodata,
