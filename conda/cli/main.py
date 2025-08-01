@@ -51,7 +51,15 @@ def main_subshell(*args, post_parse_hook=None, **kwargs):
     parser = generate_parser(add_help=True)
     args = parser.parse_args(args, override_args=override_args, namespace=pre_args)
 
-    context.__init__(argparse_args=args)
+    # if we have a file argument, then we need to read it and pass its contents to the context
+    env_spec_config = {}
+    if hasattr(args, "file"):
+        for path in args.file:
+            spec_hook = context.plugin_manager.get_environment_specifier(path)
+            file_env = spec_hook.environment_spec(path).env
+            env_spec_config[path] = vars(file_env.config)
+
+    context.__init__(argparse_args=args, env_spec_config=env_spec_config)
     init_loggers()
 
     # used with main_pip.py
