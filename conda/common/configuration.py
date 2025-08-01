@@ -62,6 +62,7 @@ if TYPE_CHECKING:
     from typing import Any
 
     from ..common.path import PathsType
+    from ..models.environment import EnvironmentConfig
 
 log = getLogger(__name__)
 
@@ -1425,7 +1426,7 @@ def custom_expandvars(
 
 
 class Configuration(metaclass=ConfigurationType):
-    def __init__(self, search_path=(), app_name=None, argparse_args=None, env_spec_config: dict[str, dict] | None = None, **kwargs):
+    def __init__(self, search_path=(), app_name=None, argparse_args=None, env_spec_config: dict[str, EnvironmentConfig] | None = None, **kwargs):
         # Currently, __init__ does a **full** disk reload of all files.
         # A future improvement would be to cache files that are already loaded.
         self.raw_data = {}
@@ -1540,11 +1541,12 @@ class Configuration(metaclass=ConfigurationType):
         self._reset_cache()
         return self
 
-    def _set_environment_spec_data(self, file: str, raw_config: dict[str, Any]):
+    def _set_environment_spec_data(self, file: str, raw_config: EnvironmentConfig):
+        config = vars(raw_config)
         self._set_raw_data(
             {
                 file: EnvironmentSpecificationRawParameter.make_raw_parameters(
-                    file, {k: v for k, v in raw_config.items() if v is not None}
+                    file, {k: v for k, v in config.items() if v is not None}
                 )
             }
         )

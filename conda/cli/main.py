@@ -57,7 +57,7 @@ def main_subshell(*args, post_parse_hook=None, **kwargs):
         for path in args.file:
             spec_hook = context.plugin_manager.get_environment_specifier(path)
             file_env = spec_hook.environment_spec(path).env
-            env_spec_config[path] = vars(file_env.config)
+            env_spec_config[path] = file_env.config
 
     context.__init__(argparse_args=args, env_spec_config=env_spec_config)
     init_loggers()

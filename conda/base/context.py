@@ -554,7 +554,7 @@ class Context(Configuration):
         self,
         search_path: PathsType | None = None,
         argparse_args: Namespace | None = None,
-        env_spec_config: dict[str, dict] | None = None,
+        env_spec_config: dict[str, Any] | None = None,
         **kwargs,
     ):
         super().__init__(argparse_args=argparse_args)
