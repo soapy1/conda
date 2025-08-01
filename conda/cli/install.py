@@ -365,16 +365,12 @@ def _assemble_environment(
                 "cannot mix specifications with conda package filenames"
             )
 
-    with fresh_context(env=os.environ, search_path=None, argparse_args=cli_args) as ctx:
-        cli_env = Environment(
-            name=name,
-            prefix=prefix,
-            platform=context.subdir,
-            requested_packages=requested_packages,
-            explicit_packages=explicit_packages,
-            config=EnvironmentConfig.from_context(),
-        )
-
+    # cli_env represents the environment described in just what is
+    # specified in the cli. That is, provided packages, and config
+    # from cli args.
+    cli_env = Environment.from_cli_args(args=cli_args)
+    cli_env.requested_packages = requested_packages
+    cli_env.explicit_packages = explicit_packages
 
     # Generate environment model from the empty environment.
     # This is important for collecting the configuration from the 
@@ -385,7 +381,7 @@ def _assemble_environment(
         name=name,
         prefix=prefix,
         platform=context.subdir,
-        config=EnvironmentConfig.from_context(),
+        config=EnvironmentConfig.from_context(context),
     )
 
     # Now let's process potential files passed via --file
@@ -428,7 +424,6 @@ def install(args, parser, command="install"):
     env = _assemble_environment(
         name=args.name,
         prefix=context.target_prefix,
-        specs=[s.strip("\"'") for s in args.packages],
         files=args.file,
         inject_default_packages=command == "create" and not args.no_default_packages,
         cli_args=args,

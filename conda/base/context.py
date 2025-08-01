@@ -2063,6 +2063,23 @@ def reset_context(
 
 
 @contextmanager
+def fresh_localized_context(
+    env: dict[str, str] | None = None,
+    search_path: PathsType = SEARCH_PATH,
+    argparse_args: Namespace | None = None,
+    **kwargs,
+) -> Iterator[Context]:
+    if env or kwargs:
+        old_env = os.environ.copy()
+        os.environ.update(env or {})
+        os.environ.update(kwargs)
+    yield Context(search_path, argparse_args)
+    if env or kwargs:
+        os.environ.clear()
+        os.environ.update(old_env)
+
+
+@contextmanager
 def fresh_context(
     env: dict[str, str] | None = None,
     search_path: PathsType = SEARCH_PATH,

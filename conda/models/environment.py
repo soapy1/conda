@@ -4,6 +4,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass, field, fields, replace
 from functools import reduce
 from itertools import chain
@@ -11,7 +12,7 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 from ..base.constants import PLATFORMS, UNKNOWN_CHANNEL
-from ..base.context import context
+from ..base.context import fresh_localized_context
 from ..common.iterators import groupby_to_dict as groupby
 from ..core.prefix_data import PrefixData
 from ..exceptions import CondaValueError
@@ -19,9 +20,11 @@ from ..history import History
 from .match_spec import MatchSpec
 
 if TYPE_CHECKING:
+    from argparse import Namespace
     from collections.abc import Iterable
     from typing import TypeVar
 
+    from ..base.context import Context
     from ..base.constants import (
         ChannelPriority,
         DepsModifier,
@@ -160,7 +163,7 @@ class EnvironmentConfig:
         return self
 
     @classmethod
-    def from_context(cls) -> EnvironmentConfig:
+    def from_context(cls, ctx: Context) -> EnvironmentConfig:
         """
         **Experimental** While experimental, expect both major and minor changes across minor releases.
 
@@ -170,7 +173,7 @@ class EnvironmentConfig:
 
         environment_settings = {
             key: value
-            for key, value in context.environment_settings.items()
+            for key, value in ctx.environment_settings.items()
             if key in field_names
         }
         return cls(**environment_settings)
@@ -468,3 +471,12 @@ class Environment:
             requested_packages=requested_packages,
             explicit_packages=explicit_packages,
         )
+
+    @classmethod
+    def from_cli_args(cls, args: Namespace) -> Environment:
+        with fresh_localized_context(env=os.environ, search_path=None, argparse_args=args) as ctx:
+            return Environment(
+                prefix=ctx.target_prefix,
+                platform=ctx.subdir,
+                config=EnvironmentConfig.from_context(ctx),
+            )
