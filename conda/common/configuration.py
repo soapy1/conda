@@ -410,6 +410,44 @@ class YamlRawParameter(RawParameter):
             return cls.make_raw_parameters(filepath, yaml_obj) or EMPTY_MAP
 
 
+class EnvironmentSpecificationRawParameter(RawParameter):
+    """This class represents a raw parameter originating from an environment specification file"""
+
+    def value(self, parameter_obj):
+        if isiterable(self._raw_value):
+            children_values = []
+            for i in range(len(self._raw_value)):
+                children_values.append(
+                    EnvironmentSpecificationRawParameter(self.source, self.key, self._raw_value[i])
+                )
+            return tuple(children_values)
+        else:
+            return deepfreeze(self._raw_value)
+
+    def keyflag(self):
+        return None
+
+    def valueflags(self, parameter_obj):
+        return None if isinstance(parameter_obj, PrimitiveLoadedParameter) else ()
+
+    @classmethod
+    def make_raw_parameters(cls, source, from_map):
+        """
+        Create an EnvironmentSpecificationRawParameter from an environment specification
+        :param source: the path to the environment specification file
+        :param from_map: a map of key-value pairs representing the configuration from the environment file
+        :return: a map of EnvironmentSpecificationRawParameters
+        """
+        if from_map:
+            return {
+                key: cls(
+                    source, key, from_map[key]
+                )
+                for key in from_map
+            }
+        return EMPTY_MAP
+
+
 class DefaultValueRawParameter(RawParameter):
     """Wraps a default value as a RawParameter, for usage in ParameterLoader."""
 
@@ -1387,7 +1425,7 @@ def custom_expandvars(
 
 
 class Configuration(metaclass=ConfigurationType):
-    def __init__(self, search_path=(), app_name=None, argparse_args=None, **kwargs):
+    def __init__(self, search_path=(), app_name=None, argparse_args=None, env_spec_config: dict[str, dict] | None = None, **kwargs):
         # Currently, __init__ does a **full** disk reload of all files.
         # A future improvement would be to cache files that are already loaded.
         self.raw_data = {}
@@ -1398,6 +1436,9 @@ class Configuration(metaclass=ConfigurationType):
         self._set_search_path(search_path, **kwargs)
         self._set_env_vars(app_name)
         self._set_argparse_args(argparse_args)
+        if env_spec_config:
+            for file, config in env_spec_config.items():
+                self._set_environment_spec_data(file, config)
 
     @classmethod
     def _set_parameter_names_and_aliases(cls):
@@ -1498,6 +1539,15 @@ class Configuration(metaclass=ConfigurationType):
 
         self._reset_cache()
         return self
+
+    def _set_environment_spec_data(self, file: str, raw_config: dict[str, Any]):
+        self._set_raw_data(
+            {
+                file: EnvironmentSpecificationRawParameter.make_raw_parameters(
+                    file, {k: v for k, v in raw_config.items() if v is not None}
+                )
+            }
+        )
 
     def _set_raw_data(self, raw_data: Mapping[Hashable, dict]):
         self.raw_data.update(raw_data)

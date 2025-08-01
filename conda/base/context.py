@@ -554,6 +554,7 @@ class Context(Configuration):
         self,
         search_path: PathsType | None = None,
         argparse_args: Namespace | None = None,
+        env_spec_config: dict[str, dict] | None = None,
         **kwargs,
     ):
         super().__init__(argparse_args=argparse_args)
@@ -565,6 +566,9 @@ class Context(Configuration):
         )
         self._set_env_vars(APP_NAME)
         self._set_argparse_args(argparse_args)
+        if env_spec_config:
+            for file, config in env_spec_config.items():
+                self._set_environment_spec_data(file, config)
 
     def post_build_validation(self) -> list[ValidationError]:
         errors = []
