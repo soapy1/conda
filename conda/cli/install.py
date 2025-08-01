@@ -331,46 +331,25 @@ def ensure_update_specs_exist(prefix: str, specs: list[str]):
 def _assemble_environment(
     name: str | None = None,
     prefix: str | None = None,
-    specs: Iterable[str] = (),
     files: Iterable[str] = (),
     inject_default_packages: bool = True,
     cli_args: Namespace | None = None,
 ) -> Environment:
-    # First, let's create an 'Environment' for the information exposed in the CLI (no files)
-    if inject_default_packages:
-        names = {MatchSpec(pkg).name for pkg in specs}
-        for pkg in context.create_default_packages:
-            pkg_name = MatchSpec(pkg).name
-            if pkg_name not in names:
-                specs.append(pkg)
-
-    requested_packages = []
-    fetch_explicit_packages = []
-
-    for spec in specs:
-        if is_package_file(spec):
-            fetch_explicit_packages.append(spec)
-        else:
-            requested_packages.append(MatchSpec(spec))
-
-    # transform explicit packages into package records
-    explicit_packages = []
-    if fetch_explicit_packages:
-        if len(fetch_explicit_packages) == len(specs):
-            explicit_packages = get_package_records_from_explicit(
-                fetch_explicit_packages
-            )
-        else:
-            raise CondaValueError(
-                "cannot mix specifications with conda package filenames"
-            )
-
     # cli_env represents the environment described in just what is
     # specified in the cli. That is, provided packages, and config
-    # from cli args.
-    cli_env = Environment.from_cli_args(args=cli_args)
-    cli_env.requested_packages = requested_packages
-    cli_env.explicit_packages = explicit_packages
+    # from cli args. Config coming from env vars will also be captured
+    # in this representation of the environment.
+    cli_env = Environment.from_cli_args(
+        cli_args=cli_args, inject_default_packages=inject_default_packages
+    )
+
+    # Now let's process potential files passed via --file
+    file_envs = []
+    for path in files:
+        # parse the file
+        spec_hook = context.plugin_manager.get_environment_specifier(path)
+        file_env = spec_hook.environment_spec(path).env
+        file_envs.append(file_env)
 
     # Generate environment model from the empty environment.
     # This is important for collecting the configuration from the 
@@ -383,14 +362,6 @@ def _assemble_environment(
         platform=context.subdir,
         config=EnvironmentConfig.from_context(context),
     )
-
-    # Now let's process potential files passed via --file
-    file_envs = []
-    for path in files:
-        # parse the file
-        spec_hook = context.plugin_manager.get_environment_specifier(path)
-        file_env = spec_hook.environment_spec(path).env
-        file_envs.append(file_env)
 
     # Merge all the environments. Cli has the highest precedence, then files,
     # then the environment coming from the context

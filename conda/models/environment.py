@@ -12,10 +12,12 @@ from logging import getLogger
 from typing import TYPE_CHECKING
 
 from ..base.constants import PLATFORMS, UNKNOWN_CHANNEL
-from ..base.context import fresh_localized_context
+from ..base.context import fresh_localized_context, context
 from ..common.iterators import groupby_to_dict as groupby
+from ..common.path import is_package_file
 from ..core.prefix_data import PrefixData
 from ..exceptions import CondaValueError
+from ..misc import get_package_records_from_explicit
 from ..history import History
 from .match_spec import MatchSpec
 
@@ -473,10 +475,43 @@ class Environment:
         )
 
     @classmethod
-    def from_cli_args(cls, args: Namespace) -> Environment:
-        with fresh_localized_context(env=os.environ, search_path=None, argparse_args=args) as ctx:
+    def from_cli_args(
+        cls, cli_args: Namespace, inject_default_packages: bool = True
+    ) -> Environment:
+        specs=[s.strip("\"'") for s in cli_args.packages],
+        if inject_default_packages:
+            names = {MatchSpec(pkg).name for pkg in specs}
+            for pkg in context.create_default_packages:
+                pkg_name = MatchSpec(pkg).name
+                if pkg_name not in names:
+                    specs.append(pkg)
+
+        requested_packages = []
+        fetch_explicit_packages = []
+
+        for spec in specs:
+            if is_package_file(spec):
+                fetch_explicit_packages.append(spec)
+            else:
+                requested_packages.append(MatchSpec(spec))
+
+        # transform explicit packages into package records
+        explicit_packages = []
+        if fetch_explicit_packages:
+            if len(fetch_explicit_packages) == len(specs):
+                explicit_packages = get_package_records_from_explicit(
+                    fetch_explicit_packages
+                )
+            else:
+                raise CondaValueError(
+                    "cannot mix specifications with conda package filenames"
+                )
+
+        with fresh_localized_context(env=os.environ, search_path=None, argparse_args=cli_args) as ctx:
             return Environment(
                 prefix=ctx.target_prefix,
                 platform=ctx.subdir,
                 config=EnvironmentConfig.from_context(ctx),
+                requested_packages=requested_packages,
+                explicit_packages=explicit_packages,
             )
