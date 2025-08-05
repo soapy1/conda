@@ -6,6 +6,7 @@ import platform
 import re
 import sys
 from datetime import datetime
+from io import StringIO
 from importlib.metadata import version
 from itertools import zip_longest
 from json import loads as json_loads
@@ -44,6 +45,7 @@ from conda.core.package_cache_data import PackageCacheData
 from conda.core.prefix_data import PrefixData
 from conda.exceptions import (
     ArgumentError,
+    CondaSystemExit,
     CondaValueError,
     DirectoryNotACondaEnvironmentError,
     DisallowedPackageError,
@@ -2756,3 +2758,75 @@ def test_dont_allow_mixed_file_arguments(conda_cli: CondaCLIFixture, cmd):
     )
 
     assert exc.match("Cannot mix environment file formats")
+
+
+def test_create_existing_path(
+    path_factory: PathFactoryFixture,
+    conda_cli: CondaCLIFixture,
+    monkeypatch: MonkeyPatch
+):
+    monkeypatch.setattr("sys.stdin", StringIO("yes\n"))
+
+    prefix = path_factory()
+    prefix.mkdir()
+
+    stdout, _, _= conda_cli(
+        "create",
+        f"--prefix={prefix}",
+        "python",
+        "--dry-run",
+        raises=DryRunExit,
+    )
+    assert "WARNING: A directory already exists" in stdout
+
+
+def test_create_existing_environment_dry_run(
+    tmp_env: TmpEnvFixture,
+    conda_cli: CondaCLIFixture,
+):
+    with tmp_env() as prefix:
+        err = conda_cli(
+            "create",
+            f"--prefix={prefix}",
+            "python",
+            "--dry-run",
+            raises=CondaValueError,
+        )
+    assert "Cannot `create --dry-run` with an existing conda environment" in str(err)
+
+
+def test_create_existing_environment(
+    tmp_env: TmpEnvFixture,
+    conda_cli: CondaCLIFixture,
+    monkeypatch: MonkeyPatch
+):
+    monkeypatch.setattr("sys.stdin", StringIO("no\n"))
+
+    with tmp_env() as prefix:
+        stdout, stderr, _ = conda_cli(
+            "create",
+            f"--prefix={prefix}",
+            "zlib",
+            raises=CondaSystemExit,
+        )
+    assert f"WARNING: A conda environment already exists at '{prefix}'" in stdout
+
+
+def test_create_existing_path(
+    path_factory: PathFactoryFixture,
+    conda_cli: CondaCLIFixture,
+    monkeypatch: MonkeyPatch
+):
+    monkeypatch.setattr("sys.stdin", StringIO("yes\n"))
+
+    prefix = path_factory()
+    prefix.mkdir()
+
+    stdout, _, _= conda_cli(
+        "create",
+        f"--prefix={prefix}",
+        "python",
+        "--dry-run",
+        raises=DryRunExit,
+    )
+    assert "WARNING: A directory already exists" in stdout
