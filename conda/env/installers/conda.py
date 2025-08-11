@@ -4,7 +4,6 @@
 
 from __future__ import annotations
 
-import tempfile
 from os.path import basename
 from typing import TYPE_CHECKING
 
@@ -13,19 +12,16 @@ from boltons.setutils import IndexedSet
 from ...base.constants import UpdateModifier
 from ...base.context import context
 from ...common.constants import NULL
-from ...env.env import EnvironmentYaml
 from ...exceptions import CondaValueError, UnsatisfiableError
 from ...models.channel import Channel, prioritize_channels
 
 if TYPE_CHECKING:
-    from argparse import Namespace
-
     from ...core.solve import Solver
     from ...models.environment import Environment
 
 
 def _solve(
-    prefix: str, specs: list[str], args: Namespace, env: Environment, *_, **kwargs
+    env: Environment, *_, **kwargs
 ) -> Solver:
     """Solve the environment.
 
@@ -49,30 +45,28 @@ def _solve(
     solver_backend = context.plugin_manager.get_cached_solver_backend()
     if solver_backend is None:
         raise CondaValueError("No solver backend found")
-    solver = solver_backend(prefix, channels, subdirs, specs_to_add=specs)
+    solver = solver_backend(env.prefix, channels, subdirs, specs_to_add=env.requested_packages)
     return solver
 
 
 def dry_run(
-    specs: list[str], args: Namespace, env: Environment, *_, **kwargs
-) -> EnvironmentYaml:
+    env: Environment, prune: bool = False, *_, **kwargs
+) -> dict:
     """Do a dry run of the environment solve.
 
-    :param specs: Package specifications to install
-    :param args: Command-line arguments
     :param env: Environment object
-    :return: Solved environment object
-    :rtype: EnvironmentYaml
+    :return: unlink link transaction action groups
     """
-    solver = _solve(tempfile.mkdtemp(), specs, args, env, *_, **kwargs)
-    pkgs = solver.solve_final_state()
-    return EnvironmentYaml(
-        name=env.name, dependencies=[str(p) for p in pkgs], channels=env.config.channels
-    )
+    solver = _solve(env)
+    unlink_link_transaction = solver.solve_for_transaction(
+            prune=prune,
+            update_modifier=UpdateModifier.FREEZE_INSTALLED,
+        )
+    return unlink_link_transaction._make_legacy_action_groups()[0]
 
 
 def install(
-    prefix: str, specs: list[str], args: Namespace, env: Environment, *_, **kwargs
+   env: Environment, prune: bool = False, *_, **kwargs
 ) -> dict | None:
     """Install packages into a conda environment.
 
@@ -96,24 +90,19 @@ def install(
     if env.explicit_packages:
         from ...misc import install_explicit_packages
 
-        # For explicit environments, we consider any provided specs as user-requested
-        # All packages in the explicit file are installed, but only user-provided specs
-        # are recorded in history as explicitly requested
-        requested_specs = specs if specs else ()
-
         # Install explicit packages - bypassing the solver completely
         return install_explicit_packages(
             package_cache_records=env.explicit_packages,
-            prefix=prefix,
-            requested_specs=requested_specs,
+            prefix=env.prefix,
+            requested_specs=env.requested_packages,
         )
 
     # For regular environments, proceed with the normal solve-based installation
-    solver = _solve(prefix, specs, args, env, *_, **kwargs)
+    solver = _solve(env)
 
     try:
         unlink_link_transaction = solver.solve_for_transaction(
-            prune=getattr(args, "prune", False),
+            prune=prune,
             update_modifier=UpdateModifier.FREEZE_INSTALLED,
         )
     except (UnsatisfiableError, SystemExit) as exc:
@@ -122,7 +111,7 @@ def install(
         if not getattr(exc, "allow_retry", True):
             raise
         unlink_link_transaction = solver.solve_for_transaction(
-            prune=getattr(args, "prune", False), update_modifier=NULL
+            prune=prune, update_modifier=NULL
         )
     # Execute the transaction and return success
     if unlink_link_transaction.nothing_to_do:

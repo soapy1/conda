@@ -533,10 +533,10 @@ class CondaInstaller(CondaPlugin):
     :meth:`~conda.plugins.hookspec.CondaSpecs.conda_installers`.
     :param name: name of the installer (e.g., ``pip``)
     :param types: the names of the types of packages it can install (e.g. conda, pip).
-    :param installer: InstallerBase subclass handler.
+    
     """
 
     name: str
     types: Iterable[str]
-    install: Callable[[Environment], dict | None]
-    dry_run: Callable[[Environment], dict | None]
+    install: Callable[[Environment, bool], dict | None]
+    dry_run: Callable[[Environment, bool], dict | None]
