@@ -16,13 +16,13 @@ from ...common.constants import NULL
 from ...env.env import EnvironmentYaml
 from ...exceptions import CondaValueError, UnsatisfiableError
 from ...models.channel import Channel, prioritize_channels
+from ...models.records import PackageRecord
 
 if TYPE_CHECKING:
     from argparse import Namespace
 
     from ...core.solve import Solver
     from ...models.environment import EnvironmentConfig
-    from ...models.records import PackageRecord
 
 
 def _solve(
@@ -65,7 +65,7 @@ def dry_run(
     :return: Solved environment object
     :rtype: EnvironmentYaml
     """
-    solver = _solve(tempfile.mkdtemp(), specs, env_config **kwargs)
+    solver = _solve(prefix, specs, env_config, **kwargs)
     pkgs = solver.solve_final_state()
     return EnvironmentYaml(
         name=prefix, dependencies=[str(p) for p in pkgs], channels=env_config.channels
@@ -107,7 +107,7 @@ def install(
         )
 
     # For regular environments, proceed with the normal solve-based installation
-    solver = _solve(prefix, specs, env_config **kwargs)
+    solver = _solve(prefix, specs, env_config, **kwargs)
 
     try:
         unlink_link_transaction = solver.solve_for_transaction(
