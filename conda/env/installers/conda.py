@@ -21,11 +21,12 @@ if TYPE_CHECKING:
     from argparse import Namespace
 
     from ...core.solve import Solver
-    from ...models.environment import Environment
+    from ...models.environment import EnvironmentConfig
+    from ...models.records import PackageRecord
 
 
 def _solve(
-    prefix: str, specs: list[str], args: Namespace, env: Environment, *_, **kwargs
+    prefix: str, specs: list[str], env_config: EnvironmentConfig, **kwargs
 ) -> Solver:
     """Solve the environment.
 
@@ -37,9 +38,9 @@ def _solve(
     """
     # TODO: support all various ways this happens
     # Including 'nodefaults' in the channels list disables the defaults
-    channel_urls = [chan for chan in env.config.channels if chan != "nodefaults"]
+    channel_urls = [chan for chan in env_config.channels if chan != "nodefaults"]
 
-    if "nodefaults" not in env.config.channels:
+    if "nodefaults" not in env_config.channels:
         channel_urls.extend(context.channels)
     _channel_priority_map = prioritize_channels(channel_urls)
 
@@ -54,7 +55,7 @@ def _solve(
 
 
 def dry_run(
-    specs: list[str], args: Namespace, env: Environment, *_, **kwargs
+    prefix: str, specs: list[str], env_config: EnvironmentConfig, **kwargs
 ) -> EnvironmentYaml:
     """Do a dry run of the environment solve.
 
@@ -64,16 +65,16 @@ def dry_run(
     :return: Solved environment object
     :rtype: EnvironmentYaml
     """
-    solver = _solve(tempfile.mkdtemp(), specs, args, env, *_, **kwargs)
+    solver = _solve(tempfile.mkdtemp(), specs, env_config **kwargs)
     pkgs = solver.solve_final_state()
     return EnvironmentYaml(
-        name=env.name, dependencies=[str(p) for p in pkgs], channels=env.config.channels
+        name=prefix, dependencies=[str(p) for p in pkgs], channels=env_config.channels
     )
 
 
 def install(
-    prefix: str, specs: list[str], args: Namespace, env: Environment, *_, **kwargs
-) -> dict | None:
+    prefix: str, specs: list, env_config: EnvironmentConfig, **kwargs
+) -> dict:
     """Install packages into a conda environment.
 
     This function handles two main paths:
@@ -93,27 +94,24 @@ def install(
         processed, the conda client SHOULD NOT invoke a solver."
     """
     # Handle explicit environments separately per CEP-23 requirements
-    if env.explicit_packages:
+    if not specs:
+        return {}
+    
+    # If the specs are package records, these are explicit packages. 
+    if isinstance(specs[0], PackageRecord):
         from ...misc import install_explicit_packages
-
-        # For explicit environments, we consider any provided specs as user-requested
-        # All packages in the explicit file are installed, but only user-provided specs
-        # are recorded in history as explicitly requested
-        requested_specs = specs if specs else ()
-
         # Install explicit packages - bypassing the solver completely
         return install_explicit_packages(
-            package_cache_records=env.explicit_packages,
+            package_cache_records=specs,
             prefix=prefix,
-            requested_specs=requested_specs,
         )
 
     # For regular environments, proceed with the normal solve-based installation
-    solver = _solve(prefix, specs, args, env, *_, **kwargs)
+    solver = _solve(prefix, specs, env_config **kwargs)
 
     try:
         unlink_link_transaction = solver.solve_for_transaction(
-            prune=getattr(args, "prune", False),
+            prune=getattr(kwargs, "prune", False),
             update_modifier=UpdateModifier.FREEZE_INSTALLED,
         )
     except (UnsatisfiableError, SystemExit) as exc:
@@ -122,7 +120,7 @@ def install(
         if not getattr(exc, "allow_retry", True):
             raise
         unlink_link_transaction = solver.solve_for_transaction(
-            prune=getattr(args, "prune", False), update_modifier=NULL
+            prune=getattr(kwargs, "prune", False), update_modifier=NULL
         )
     # Execute the transaction and return success
     if unlink_link_transaction.nothing_to_do:

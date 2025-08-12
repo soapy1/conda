@@ -33,7 +33,7 @@ from ..exceptions import (
 from . import (
     environment_exporters,
     environment_specifiers,
-    # installers,
+    installers,
     post_solves,
     prefix_data_loaders,
     reporter_backends,
@@ -845,6 +845,7 @@ class CondaPluginManager(pluggy.PluginManager):
         if len(found) == 1:
             return found[0]
         if found:
+            # TODO: choose preferred plugin for the type of installer
             names = ", ".join([hook.name for hook in found])
             raise PluginError(
                 f"Too many env installers registered for '{installer_name}': {names}"
