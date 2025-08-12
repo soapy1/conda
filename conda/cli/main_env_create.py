@@ -166,36 +166,36 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
         context.create_default_packages if not args.no_default_packages else []
     )
 
+    prune = getattr(args, "prune", False)
     if args.dry_run:
         installer_type = "conda"
-        installer = get_installer(installer_type)
+        installer = context.plugin_manager.get_installer(installer_type)
 
         pkg_specs = [*env.requested_packages, *args_packages]
 
-        solved_env = installer.dry_run(pkg_specs, args, env)
+        output_transaction = installer.dry_run(env, prune)
+        # TODO: should not be changing the output type here.
         if args.json:
-            print(json.dumps(solved_env.to_dict()))
+            print(json.dumps(output_transaction))
         else:
-            print(solved_env.to_yaml(), end="")
+            print(output_transaction, end="")
 
     else:
         if args_packages:
             installer_type = "conda"
-            installer = get_installer(installer_type)
-            result[installer_type] = installer.install(prefix, args_packages, args, env)
+            installer = context.plugin_manager.get_installer(installer_type)
+            result[installer_type] = installer.install(env, prune)
 
         # install conda packages
         installer_type = "conda"
-        installer = get_installer(installer_type)
-        result[installer_type] = installer.install(
-            prefix, env.requested_packages, args, env
-        )
+        installer = context.plugin_manager.get_installer(installer_type)
+        result[installer_type] = installer.install(env, prune)
 
         # install all other external packages
         for installer_type, pkg_specs in env.external_packages.items():
             try:
-                installer = get_installer(installer_type)
-                result[installer_type] = installer.install(prefix, pkg_specs, args, env)
+                installer = context.plugin_manager.get_installer(installer_type)
+                result[installer_type] = installer.install(env, prune)
             except InvalidInstaller:
                 raise CondaError(
                     dals(

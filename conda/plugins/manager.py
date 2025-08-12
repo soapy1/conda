@@ -33,6 +33,7 @@ from ..exceptions import (
 from . import (
     environment_exporters,
     environment_specifiers,
+    installers,
     post_solves,
     prefix_data_loaders,
     reporter_backends,
@@ -838,7 +839,6 @@ class CondaPluginManager(pluggy.PluginManager):
         Raises CondaValueError if no installer were found for that installer name.
         """
         found = []
-        import pdb; pdb.set_trace()
         for hook in self.get_hook_results("installers"):
             if installer_name in hook.types:
                 found.append(hook)
@@ -870,6 +870,7 @@ def get_plugin_manager() -> CondaPluginManager:
         *prefix_data_loaders.plugins,
         *environment_specifiers.plugins,
         *environment_exporters.plugins,
+        *installers.plugins,
     )
     plugin_manager.load_entrypoints(spec_name)
     return plugin_manager

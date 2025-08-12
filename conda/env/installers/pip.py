@@ -5,16 +5,11 @@
 import os
 import os.path as op
 from logging import getLogger
-from typing import TYPE_CHECKING
 
 from ...auxlib.compat import Utf8NamedTemporaryFile
 from ...env.pip_util import get_pip_installed_packages, pip_subprocess
-from ...gateways.connection.session import CONDA_SESSION_SCHEMES
 from ...reporters import get_spinner
-
-if TYPE_CHECKING:
-    from ...models.environment import Environment
-
+from ...models.environment import Environment
 
 log = getLogger(__name__)
 

@@ -2,14 +2,14 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Register the pip installer for conda env files."""
 
-from .. import CondaEnvInstaller, hookimpl
+from .. import CondaInstaller, hookimpl
 
 
 @hookimpl
-def conda_env_installers():
+def conda_installers():
     from ...env.installers.pip import dry_run, install
 
-    yield CondaEnvInstaller(
+    yield CondaInstaller(
         name="pip",
         types=("pip",),
         install=install,
