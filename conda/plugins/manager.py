@@ -33,6 +33,7 @@ from ..exceptions import (
 from . import (
     environment_exporters,
     environment_specifiers,
+    installers,
     post_solves,
     prefix_data_loaders,
     reporter_backends,
@@ -52,6 +53,7 @@ if TYPE_CHECKING:
 
     from ..core.path_actions import Action
     from ..core.solve import Solver
+    from ..models.environment import Environment
     from ..models.match_spec import MatchSpec
     from ..models.records import PackageRecord
     from .types import (
@@ -59,6 +61,7 @@ if TYPE_CHECKING:
         CondaEnvironmentExporter,
         CondaEnvironmentSpecifier,
         CondaHealthCheck,
+        CondaInstaller,
         CondaPostCommand,
         CondaPostSolve,
         CondaPostTransactionAction,
@@ -273,6 +276,9 @@ class CondaPluginManager(pluggy.PluginManager):
     def get_hook_results(
         self, name: Literal["environment_exporters"]
     ) -> list[CondaEnvironmentExporter]: ...
+
+    @overload
+    def get_hook_results(self, name: Literal["installers"]) -> list[CondaInstaller]: ...
 
     def get_hook_results(self, name, **kwargs):
         """
@@ -826,6 +832,30 @@ class CondaPluginManager(pluggy.PluginManager):
             )
             for hook in self.get_hook_results("post_transaction_actions")
         ]
+    
+    def invoke_installers(self, env: Environment) -> dict[str, dict]:
+        # TODO:
+        # - loop thru all installers types and execute an install.
+        # - collect all the results
+        return {}
+    
+    def get_installer(self, installer_type: str) -> CondaInstaller:
+        """
+        Returns the installer registered for the given installer name.
+        Raises PluginError if more than one installer is found for the same installer name.
+        Raises CondaValueError if no installer were found for that installer name.
+        """
+        found = {}
+        for hook in self.get_hook_results("installers"):
+            if installer_type in hook.types:
+                found[hook.name] = hook
+        if len(found) == 1:
+            return next(iter(found.values()))
+        if len(found) > 1:
+            raise PluginError(
+                f"Too many installers registered for '{installer_type}': {dashlist(found.keys())}"
+            )
+        raise CondaValueError(f"Could not find env installer for '{installer_type}'.")
 
 
 @functools.cache
@@ -846,6 +876,7 @@ def get_plugin_manager() -> CondaPluginManager:
         *prefix_data_loaders.plugins,
         *environment_specifiers.plugins,
         *environment_exporters.plugins,
+        *installers.plugins,
     )
     plugin_manager.load_entrypoints(spec_name)
     return plugin_manager

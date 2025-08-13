@@ -21,6 +21,7 @@ if TYPE_CHECKING:
         CondaAuthHandler,
         CondaEnvironmentExporter,
         CondaEnvironmentSpecifier,
+        CondaInstaller,
         CondaHealthCheck,
         CondaPostCommand,
         CondaPostSolve,
@@ -729,4 +730,8 @@ class CondaSpecs:
                     export=export_toml,
                 )
         """
+        yield from ()
+
+    @_hookspec
+    def conda_installers(self) -> Iterable[CondaInstaller]:
         yield from ()

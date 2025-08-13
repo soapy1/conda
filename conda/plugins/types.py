@@ -12,7 +12,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from contextlib import nullcontext
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Iterable
 
 from requests.auth import AuthBase
 
@@ -522,3 +522,20 @@ class CondaEnvironmentExporter(CondaPlugin):
         except AttributeError:
             # AttributeError: alias is not a string
             raise PluginError(f"Invalid plugin aliases for {self!r}")
+
+
+@dataclass
+class CondaInstaller(CondaPlugin):
+    """
+    **EXPERIMENTAL**
+    Return type to use when defining a conda installer plugin hook.
+    For details on how this is used, see
+    :meth:`~conda.plugins.hookspec.CondaSpecs.conda_installers`.
+    :param name: name of the installer (e.g., ``pip``)
+    :param types: the names of the types of packages it can install (e.g. conda, pip).
+    :param install: callable that executes an install
+    """
+
+    name: str
+    types: Iterable[str]
+    install: Callable[[Environment, dict], dict]

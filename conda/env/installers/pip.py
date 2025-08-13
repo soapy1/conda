@@ -8,13 +8,13 @@ from logging import getLogger
 
 from ...auxlib.compat import Utf8NamedTemporaryFile
 from ...env.pip_util import get_pip_installed_packages, pip_subprocess
-from ...gateways.connection.session import CONDA_SESSION_SCHEMES
+from ...models.environment import Environment
 from ...reporters import get_spinner
 
 log = getLogger(__name__)
 
 
-def _pip_install_via_requirements(prefix, specs, args, *_, **kwargs):
+def _pip_install_via_requirements(prefix, specs, *_, **kwargs):
     """
     Installs the pip dependencies in specs using a temporary pip requirements file.
 
@@ -28,16 +28,7 @@ def _pip_install_via_requirements(prefix, specs, args, *_, **kwargs):
       See: https://pip.pypa.io/en/stable/user_guide/#requirements-files
            https://pip.pypa.io/en/stable/reference/pip_install/#requirements-file-format
     """
-    url_scheme = args.file.split("://", 1)[0]
-    if url_scheme in CONDA_SESSION_SCHEMES:
-        pip_workdir = None
-    else:
-        try:
-            pip_workdir = op.dirname(op.abspath(args.file))
-            if not os.access(pip_workdir, os.W_OK):
-                pip_workdir = None
-        except AttributeError:
-            pip_workdir = None
+    pip_workdir = None
     requirements = None
     try:
         # Generate the temporary requirements file
@@ -67,6 +58,14 @@ def _pip_install_via_requirements(prefix, specs, args, *_, **kwargs):
     return get_pip_installed_packages(stdout)
 
 
-def install(*args, **kwargs):
-    with get_spinner("Installing pip dependencies"):
-        return _pip_install_via_requirements(*args, **kwargs)
+def install(env: Environment, prune: bool = False, *args, **kwargss):
+    pip_packages = env.external_packages.get("pip", None)
+    if pip_packages:
+        with get_spinner("Installing pip dependencies"):
+            installed = _pip_install_via_requirements(
+                prefix=env.prefix,
+                specs=pip_packages,
+            )
+            return {"installed": installed}
+    return {}
+
