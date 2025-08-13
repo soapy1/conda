@@ -16,8 +16,10 @@ from typing import TYPE_CHECKING, Callable, Iterable
 
 from requests.auth import AuthBase
 
+from .config import PluginConfig
 from ..exceptions import PluginError
 from ..models.records import PackageRecord
+from ..common.configuration import PrimitiveParameter
 
 if TYPE_CHECKING:
     from argparse import ArgumentParser, Namespace
@@ -538,5 +540,5 @@ class CondaInstaller(CondaPlugin):
 
     name: str
     types: Iterable[str]
-    install: Callable[[str, list, EnvironmentConfig, dict], dict | None]
-    dry_run: Callable[[str, list, EnvironmentConfig, dict], dict | None]
+    install: Callable[[str, list, EnvironmentConfig, dict], dict]
+    dry_run: Callable[[str, list, EnvironmentConfig, dict], dict]

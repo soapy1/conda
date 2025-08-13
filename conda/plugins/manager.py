@@ -832,25 +832,29 @@ class CondaPluginManager(pluggy.PluginManager):
             for hook in self.get_hook_results("post_transaction_actions")
         ]
     
-    def get_installer(self, installer_name: str) -> CondaInstaller:
+    def get_installer(self, installer_type: str) -> CondaInstaller:
         """
         Returns the installer registered for the given installer name.
         Raises PluginError if more than one installer is found for the same installer name.
         Raises CondaValueError if no installer were found for that installer name.
         """
-        found = []
+        found = {}
         for hook in self.get_hook_results("installers"):
-            if installer_name in hook.types:
-                found.append(hook)
+            if installer_type in hook.types:
+                found[hook.name] = hook
         if len(found) == 1:
-            return found[0]
+            return next(iter(found.values()))
         if found:
-            # TODO: choose preferred plugin for the type of installer
-            names = ", ".join([hook.name for hook in found])
+            # Choose preferred plugin for the type of installer. Users may set
+            # their preferred installer for a given type using plugin config. 
+            # This will check for config with the name `<type>_preferred_installer`.
+            preferred_installer = getattr(context.plugins, f"{installer_type}_preferred_installer", None)
+            if preferred_installer in found.keys():
+                return found[preferred_installer]
             raise PluginError(
-                f"Too many env installers registered for '{installer_name}': {names}"
+                f"Too many env installers registered for '{installer_type}': {', '.join(found.keys())}"
             )
-        raise CondaValueError(f"Could not find env installer for '{installer_name}'.")
+        raise CondaValueError(f"Could not find env installer for '{installer_type}'.")
 
 
 @functools.cache

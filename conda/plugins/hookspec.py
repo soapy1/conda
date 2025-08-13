@@ -732,5 +732,6 @@ class CondaSpecs:
         """
         yield from ()
 
+    @_hookspec
     def conda_installers(self) -> Iterable[CondaInstaller]:
         yield from ()

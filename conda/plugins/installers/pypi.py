@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Register the pip installer for conda env files."""
 
-from .. import CondaInstaller, hookimpl
+from .. import CondaInstaller, CondaSetting, hookimpl
 from ...models.environment import EnvironmentConfig
+from ...common.configuration import PrimitiveParameter
 
 def uv_install(prefix: str, specs: list[str], config: EnvironmentConfig, **kwargs) -> dict:
     print("pretending to install stuff with uv")
@@ -35,4 +36,20 @@ def conda_installers():
         types=("uv","pypi", "pip"),
         install=uv_install,
         dry_run=uv_dry_run,
+    )
+
+@hookimpl
+def conda_settings():
+    yield CondaSetting(
+        name="pypi_preferred_installer",
+        description="preferred installer for pip",
+        parameter=PrimitiveParameter(""),
+        aliases=("pip_preferred_installer", ),
+    )
+
+    yield CondaSetting(
+        name="pip_preferred_installer",
+        description="preferred installer for pip",
+        parameter=PrimitiveParameter(""),
+        aliases=("pypi_preferred_installer", ),
     )
