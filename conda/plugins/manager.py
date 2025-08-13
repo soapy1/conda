@@ -849,8 +849,11 @@ class CondaPluginManager(pluggy.PluginManager):
             # their preferred installer for a given type using plugin config. 
             # This will check for config with the name `<type>_preferred_installer`.
             preferred_installer = getattr(context.plugins, f"{installer_type}_preferred_installer", None)
-            if preferred_installer in found.keys():
-                return found[preferred_installer]
+            if preferred_installer:
+                if preferred_installer in found.keys():
+                    return found[preferred_installer]
+                else:
+                    raise CondaValueError(f"Could not find preferred installer plugin '{preferred_installer}' for installing package from '{installer_type}'.")
             raise PluginError(
                 f"Too many env installers registered for '{installer_type}': {', '.join(found.keys())}"
             )

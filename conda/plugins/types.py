@@ -542,3 +542,14 @@ class CondaInstaller(CondaPlugin):
     types: Iterable[str]
     install: Callable[[str, list, EnvironmentConfig, dict], dict]
     dry_run: Callable[[str, list, EnvironmentConfig, dict], dict]
+
+    def __post_init__(self):
+        # Handle name normalization
+        super().__post_init__()
+        
+        # Configure plugin settings for preferred_installers
+        PluginConfig.add_plugin_setting(
+            name=f"{self.name}_preferred_installer",
+            parameter=PrimitiveParameter(""),
+            aliases=[f"{t}_preferred_installer" for t in self.types]
+        )

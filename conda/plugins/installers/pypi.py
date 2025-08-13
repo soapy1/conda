@@ -37,19 +37,3 @@ def conda_installers():
         install=uv_install,
         dry_run=uv_dry_run,
     )
-
-@hookimpl
-def conda_settings():
-    yield CondaSetting(
-        name="pypi_preferred_installer",
-        description="preferred installer for pip",
-        parameter=PrimitiveParameter(""),
-        aliases=("pip_preferred_installer", ),
-    )
-
-    yield CondaSetting(
-        name="pip_preferred_installer",
-        description="preferred installer for pip",
-        parameter=PrimitiveParameter(""),
-        aliases=("pypi_preferred_installer", ),
-    )
