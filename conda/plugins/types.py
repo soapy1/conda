@@ -548,8 +548,9 @@ class CondaInstaller(CondaPlugin):
         super().__post_init__()
         
         # Configure plugin settings for preferred_installers
-        PluginConfig.add_plugin_setting(
-            name=f"{self.name}_preferred_installer",
-            parameter=PrimitiveParameter(""),
-            aliases=[f"{t}_preferred_installer" for t in self.types]
-        )
+        for t in self.types:
+            PluginConfig.add_plugin_setting(
+                name=f"{t}_preferred_installer",
+                parameter=PrimitiveParameter(""),
+                # aliases=[f"{t}_preferred_installer" for t in self.types]
+            )

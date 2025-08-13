@@ -855,7 +855,9 @@ class CondaPluginManager(pluggy.PluginManager):
                 else:
                     raise CondaValueError(f"Could not find preferred installer plugin '{preferred_installer}' for installing package from '{installer_type}'.")
             raise PluginError(
-                f"Too many env installers registered for '{installer_type}': {', '.join(found.keys())}"
+                f"Too many installers registered for '{installer_type}': {dashlist(found.keys())}"
+                f"\n\nSet the default installer for package type `{installer_type}` by configuring the setting `{installer_type}_preferred_installer`."
+                f"\nFor example:\n  `export CONDA_PLUGINS_PIP_PREFERRED_INSTALLER=uv`."
             )
         raise CondaValueError(f"Could not find env installer for '{installer_type}'.")
 
