@@ -28,7 +28,11 @@ def conda_installers():
 
     yield CondaInstaller(
         name="uv",
-        types=("uv","pypi"),
+        # uv is not meant to be able to install pip packages
+        # but, for the purpose of this demo "pypi" and "pip" will
+        # be used interchangeably. This is to avoid implementing
+        # a new type of dependency in the conda.env.env module. 
+        types=("uv","pypi", "pip"),
         install=uv_install,
         dry_run=uv_dry_run,
     )
