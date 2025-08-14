@@ -500,16 +500,12 @@ class Environment:
         # environment spec plugin. The core conda cli commands are not
         # ready for that yet. So, use this old way of reading specs from
         # files.
-        for fpath in args.file:
-            try:
-                specs.extend(
-                    [spec for spec in specs_from_url(fpath) if spec != EXPLICIT_MARKER]
-                )
-            except UnicodeError:
-                raise CondaError(
-                    "Error reading file, file should be a text file containing packages\n"
-                    "See `conda create --help` for details."
-                )
+        file_envs = []
+        for path in args.file:
+            # parse the file
+            spec_hook = context.plugin_manager.get_environment_specifier(path)
+            file_env = spec_hook.environment_spec(path).env
+            file_envs.append(file_env)
 
         # Add default packages if required. If the default package is already
         # present in the list of specs, don't add it (this will override any
@@ -538,7 +534,7 @@ class Environment:
                     "Cannot mix specifications with conda package filenames"
                 )
 
-        return Environment(
+        cli_env =  Environment(
             name=args.name,
             prefix=context.target_prefix,
             platform=context.subdir,
@@ -546,3 +542,5 @@ class Environment:
             explicit_packages=explicit_packages,
             config=EnvironmentConfig.from_context(),
         )
+
+        return Environment.merge(cli_env, *file_envs)

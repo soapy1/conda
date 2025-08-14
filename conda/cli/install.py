@@ -17,6 +17,7 @@ from pathlib import Path
 
 from boltons.setutils import IndexedSet
 
+from ..auxlib.ish import dals
 from ..base.constants import (
     REPODATA_FN,
     ROOT_ENV_NAME,
@@ -33,6 +34,7 @@ from ..core.prefix_data import PrefixData
 from ..core.solve import diff_for_unlink_link_precs
 from ..deprecations import deprecated
 from ..exceptions import (
+    CondaError,
     CondaEnvException,
     CondaExitZero,
     CondaImportError,
@@ -42,6 +44,7 @@ from ..exceptions import (
     CondaValueError,
     DirectoryNotACondaEnvironmentError,
     DryRunExit,
+    InvalidInstaller,
     NoBaseEnvironmentError,
     PackageNotInstalledError,
     PackagesNotFoundError,
@@ -424,6 +427,23 @@ def install(args, parser, command="install"):
                 raise e
 
     handle_txn(unlink_link_transaction, prefix, args, newenv)
+
+    # install all other external packages
+    for installer_type, pkg_specs in env.external_packages.items():
+        try:
+            installer = context.plugin_manager.get_installer(installer_type)
+            installer.install(prefix, pkg_specs, env.config)
+        except InvalidInstaller:
+            raise CondaError(
+                dals(
+                    f"""
+                    Unable to install package for {installer_type}.
+
+                    Please double check and ensure your dependencies for {installer_type}
+                    are correctly formatted.
+                    """
+                )
+            )
 
 
 def install_clone(args, parser):
