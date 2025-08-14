@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Register the built-in env_installer hook implementations."""
 
-from . import conda, pypi_pip
+from . import conda, pypi_pip, pypi_uv
 
 #: The list of env_installer plugins for easier registration with pluggy
-plugins = [conda, pypi_pip]
+plugins = [conda, pypi_pip, pypi_uv]
