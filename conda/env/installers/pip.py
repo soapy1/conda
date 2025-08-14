@@ -59,6 +59,8 @@ def _pip_install_via_requirements(prefix, specs, *_, **kwargs):
 
 
 def install(env: Environment, prune: bool = False, *args, **kwargss):
+    # Check if there are pip packages. If there are, install them,
+    # otherwise, no-op
     pip_packages = env.external_packages.get("pip", None)
     if pip_packages:
         with get_spinner("Installing pip dependencies"):
@@ -67,7 +69,6 @@ def install(env: Environment, prune: bool = False, *args, **kwargss):
                 specs=pip_packages,
             )
             return {"installed": installed}
-    return {}
 
 
 def dry_run(

@@ -832,20 +832,45 @@ class CondaPluginManager(pluggy.PluginManager):
             )
             for hook in self.get_hook_results("post_transaction_actions")
         ]
+
     
     def invoke_installers(
             self, env: Environment, prune: bool = False, dry_run: bool = False
         ) -> dict[str, dict]:
         result = {}
-        # Loop thru each installer and run them
-        for hook in self.get_hook_results("installers"):
+        
+        # TODO: list of default installers
+        DEFAULT_INSTALLERS = ("conda", )
+        all_installers = self.get_installers()
+
+        # Build a list of installer plugins to run. We'll add the default 
+        # installers first.
+        run_installers = [all_installers[i] for i in DEFAULT_INSTALLERS]
+
+        # Also add installers that are part of the external packages. 
+        for installer in env.external_packages.keys():
+            to_add = self.get_installer_by_type(installer)
+            if to_add not in run_installers:
+                run_installers.append(to_add)
+
+        # Run all the relevant installers
+        for installer_plugin in run_installers:
             if dry_run:
-                result[hook.name] = hook.dry_run(env, prune)
+                result[installer_plugin.name] = installer_plugin.dry_run(env, prune)
             else:
-                result[hook.name] = hook.install(env, prune)
+                result[installer_plugin.name] = installer_plugin.install(env, prune)
+        
         return result
     
-    def get_installer(self, installer_type: str) -> CondaInstaller:
+    def get_installers(self) -> dict[str, CondaInstaller]:
+        """
+        Returns a mapping from installer name to installer.
+        """
+        return {
+            hook.name: hook for hook in self.get_hook_results("installers")
+        }
+    
+    def get_installer_by_type(self, installer_type: str) -> CondaInstaller:
         """
         Returns the installer registered for the given installer name.
         Raises PluginError if more than one installer is found for the same installer name.
@@ -857,12 +882,22 @@ class CondaPluginManager(pluggy.PluginManager):
                 found[hook.name] = hook
         if len(found) == 1:
             return next(iter(found.values()))
-        if len(found) > 1:
+        if found:
+            # Choose preferred plugin for the type of installer. Users may set
+            # their preferred installer for a given type using plugin config. 
+            # This will check for config with the name `<type>_preferred_installer`.
+            preferred_installer = getattr(context.plugins, f"{installer_type}_preferred_installer", None)
+            if preferred_installer:
+                if preferred_installer in found.keys():
+                    return found[preferred_installer]
+                else:
+                    raise CondaValueError(f"Could not find preferred installer plugin '{preferred_installer}' for installing package from '{installer_type}'.")
             raise PluginError(
                 f"Too many installers registered for '{installer_type}': {dashlist(found.keys())}"
+                f"\n\nSet the default installer for package type `{installer_type}` by configuring the setting `{installer_type}_preferred_installer`."
+                f"\nFor example:\n  `export CONDA_PLUGINS_PIP_PREFERRED_INSTALLER=uv`."
             )
         raise CondaValueError(f"Could not find env installer for '{installer_type}'.")
-
 
 @functools.cache
 def get_plugin_manager() -> CondaPluginManager:

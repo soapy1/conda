@@ -168,7 +168,6 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
 
     prune = getattr(args, "prune", False)
     if args.dry_run:
-        installer_type = "conda"
         output = context.plugin_manager.invoke_installers(env, prune, dry_run=True)
         # TODO: fix types
         if args.json:

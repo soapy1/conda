@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING, Callable, Iterable
 
 from requests.auth import AuthBase
 
+from .config import PluginConfig
+from ..common.configuration import PrimitiveParameter
 from ..exceptions import PluginError
 from ..models.records import PackageRecord
 
@@ -540,3 +542,16 @@ class CondaInstaller(CondaPlugin):
     types: Iterable[str]
     install: Callable[[Environment, dict], dict]
     dry_run: Callable[[Environment, dict], dict]
+
+    def __post_init__(self):
+        # Handle name normalization
+        super().__post_init__()
+
+        # Configure plugin settings for preferred_installers
+        # TODO: not sure if this is an ok way to set up this config.
+        for t in self.types:
+            PluginConfig.add_plugin_setting(
+                name=f"{t}_preferred_installer",
+                parameter=PrimitiveParameter(""),
+                # aliases=(f"{t}_preferred_installer" for t in self.types)
+            )

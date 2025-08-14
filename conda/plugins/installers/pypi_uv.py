@@ -14,7 +14,6 @@ UV_INSTALLABLE_TYPES = (
 
 def uv_install(env: Environment, prune: bool = False, **kwargs) -> dict:
     result = {"install": []}
-    # TODO: need to do something here about preferred type for overlapping tools
     for install_type in UV_INSTALLABLE_TYPES:
         install_packages = env.external_packages.get(install_type, None)
         if install_packages:
@@ -27,7 +26,6 @@ def uv_install(env: Environment, prune: bool = False, **kwargs) -> dict:
 
 def uv_dry_run(env: Environment, prune: bool = False, **kwargs) -> dict:
     result = {"dry-run": []}
-    # TODO: need to do something here about preferred type for overlapping tools
     for install_type in UV_INSTALLABLE_TYPES:
         install_packages = env.external_packages.get(install_type, None)
         if install_packages:

@@ -11,7 +11,7 @@ def conda_installers():
 
     yield CondaInstaller(
         name="pypi-pip",
-        types=("pip", "pypi"),
+        types=("pypi_pip", "pip", "pypi"),
         install=install,
         dry_run=dry_run,
     )
