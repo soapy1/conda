@@ -33,6 +33,7 @@ from ..exceptions import (
 from . import (
     environment_exporters,
     environment_specifiers,
+    installers,
     post_solves,
     prefix_data_loaders,
     reporter_backends,
@@ -59,6 +60,7 @@ if TYPE_CHECKING:
         CondaEnvironmentExporter,
         CondaEnvironmentSpecifier,
         CondaHealthCheck,
+        CondaInstaller,
         CondaPostCommand,
         CondaPostSolve,
         CondaPostTransactionAction,
@@ -189,6 +191,9 @@ class CondaPluginManager(pluggy.PluginManager):
                 if self.register(plugin):
                     count += 1
         return count
+
+    @overload
+    def get_hook_results(self, name: Literal["installers"]) -> list[CondaInstaller]: ...
 
     @overload
     def get_hook_results(
@@ -826,6 +831,35 @@ class CondaPluginManager(pluggy.PluginManager):
             )
             for hook in self.get_hook_results("post_transaction_actions")
         ]
+    
+    def get_installer(self, installer_type: str) -> CondaInstaller:
+        """
+        Returns the installer registered for the given installer name.
+        Raises PluginError if more than one installer is found for the same installer name.
+        Raises CondaValueError if no installer were found for that installer name.
+        """
+        found = {}
+        for hook in self.get_hook_results("installers"):
+            if installer_type in hook.types:
+                found[hook.name] = hook
+        if len(found) == 1:
+            return next(iter(found.values()))
+        if found:
+            # Choose preferred plugin for the type of installer. Users may set
+            # their preferred installer for a given type using plugin config. 
+            # This will check for config with the name `<type>_preferred_installer`.
+            preferred_installer = getattr(context.plugins, f"{installer_type}_preferred_installer", None)
+            if preferred_installer:
+                if preferred_installer in found.keys():
+                    return found[preferred_installer]
+                else:
+                    raise CondaValueError(f"Could not find preferred installer plugin '{preferred_installer}' for installing package from '{installer_type}'.")
+            raise PluginError(
+                f"Too many installers registered for '{installer_type}': {dashlist(found.keys())}"
+                f"\n\nSet the default installer for package type `{installer_type}` by configuring the setting `{installer_type}_preferred_installer`."
+                f"\nFor example:\n  `export CONDA_PLUGINS_PIP_PREFERRED_INSTALLER=uv`."
+            )
+        raise CondaValueError(f"Could not find env installer for '{installer_type}'.")
 
 
 @functools.cache
@@ -846,6 +880,7 @@ def get_plugin_manager() -> CondaPluginManager:
         *prefix_data_loaders.plugins,
         *environment_specifiers.plugins,
         *environment_exporters.plugins,
+        *installers.plugins,
     )
     plugin_manager.load_entrypoints(spec_name)
     return plugin_manager

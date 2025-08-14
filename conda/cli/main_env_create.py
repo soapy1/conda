@@ -113,6 +113,7 @@ def configure_parser(sub_parsers: _SubParsersAction, **kwargs) -> ArgumentParser
 def execute(args: Namespace, parser: ArgumentParser) -> int:
     from ..auxlib.ish import dals
     from ..base.context import context, determine_target_prefix
+    from ..common.constants import NULL
     from ..common.serialize import json
     from ..core.prefix_data import PrefixData
     from ..env.env import print_result
@@ -166,36 +167,37 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
         context.create_default_packages if not args.no_default_packages else []
     )
 
+    cli_args = {k: v for k,v in vars(args).items() if v != NULL and v != None}
+
     if args.dry_run:
         installer_type = "conda"
         installer = get_installer(installer_type)
 
         pkg_specs = [*env.requested_packages, *args_packages]
 
-        solved_env = installer.dry_run(pkg_specs, args, env)
+        solved_env = installer.dry_run(env.prefix, pkg_specs, env.config, **cli_args)
         if args.json:
             print(json.dumps(solved_env.to_dict()))
         else:
             print(solved_env.to_yaml(), end="")
 
     else:
+        # Install conda packages
         if args_packages:
             installer_type = "conda"
             installer = get_installer(installer_type)
-            result[installer_type] = installer.install(prefix, args_packages, args, env)
-
-        # install conda packages
+            result[installer_type] = installer.install(prefix, args_packages, env.config, **cli_args)
         installer_type = "conda"
         installer = get_installer(installer_type)
         result[installer_type] = installer.install(
-            prefix, env.requested_packages, args, env
+            prefix, env.requested_packages, env.config, **cli_args
         )
 
         # install all other external packages
         for installer_type, pkg_specs in env.external_packages.items():
             try:
-                installer = get_installer(installer_type)
-                result[installer_type] = installer.install(prefix, pkg_specs, args, env)
+                installer = context.plugin_manager.get_installer(installer_type)
+                result[installer_type] = installer.install(prefix, pkg_specs, env.config, **cli_args)
             except InvalidInstaller:
                 raise CondaError(
                     dals(
