@@ -91,9 +91,6 @@ def install(
         This implementation follows CEP-23, which states: "When an explicit input file is
         processed, the conda client SHOULD NOT invoke a solver."
     """
-    if dry_run:
-        return dry_run(env, prune)
-
     # Handle explicit environments separately per CEP-23 requirements
     if env.explicit_packages:
         from ...misc import install_explicit_packages

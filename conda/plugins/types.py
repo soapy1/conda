@@ -539,3 +539,4 @@ class CondaInstaller(CondaPlugin):
     name: str
     types: Iterable[str]
     install: Callable[[Environment, dict], dict]
+    dry_run: Callable[[Environment, dict], dict]

@@ -7,10 +7,11 @@ from .. import CondaInstaller, hookimpl
 
 @hookimpl
 def conda_installers():
-    from ...env.installers.conda import install
+    from ...env.installers.conda import dry_run, install
 
     yield CondaInstaller(
         name="conda",
         types=("conda",),
         install=install,
+        dry_run=dry_run,
     )

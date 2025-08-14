@@ -169,46 +169,14 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
     prune = getattr(args, "prune", False)
     if args.dry_run:
         installer_type = "conda"
-        installer = context.plugin_manager.get_installer(installer_type)
-
-        pkg_specs = [*env.requested_packages, *args_packages]
-
-        output_transaction = installer.dry_run(env, prune)
+        output = context.plugin_manager.invoke_installers(env, prune, dry_run=True)
         # TODO: fix types
         if args.json:
-            print(json.dumps(output_transaction))
+            print(json.dumps(output))
         else:
-            print(output_transaction, end="")
-
+            print(output, end="")
     else:
-        if args_packages:
-            installer_type = "conda"
-            installer = context.plugin_manager.get_installer(installer_type)
-            result[installer_type] = installer.install(env, prune)
-
-        # install conda packages
-        installer_type = "conda"
-        installer = context.plugin_manager.get_installer(installer_type)
-        result[installer_type] = installer.install(env, prune)
-
-        # install all other external packages
-        for installer_type, pkg_specs in env.external_packages.items():
-            try:
-                installer = context.plugin_manager.get_installer(installer_type)
-                result[installer_type] = installer.install(env, prune)
-            except InvalidInstaller:
-                raise CondaError(
-                    dals(
-                        f"""
-                        Unable to install package for {installer_type}.
-
-                        Please double check and ensure your dependencies file has
-                        the correct spelling. You might also try installing the
-                        conda-env-{installer_type} package to see if provides
-                        the required installer.
-                        """
-                    )
-                )
+        output = context.plugin_manager.invoke_installers(env, prune)
 
         if context.subdir != context._native_subdir():
             set_keys(

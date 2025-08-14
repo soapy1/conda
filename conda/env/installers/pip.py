@@ -69,3 +69,8 @@ def install(env: Environment, prune: bool = False, *args, **kwargss):
             return {"installed": installed}
     return {}
 
+
+def dry_run(
+    env: Environment, prune: bool = False, *_, **kwargs
+) -> dict:
+    return {"dry-run": env.external_packages.get("pip", None)}

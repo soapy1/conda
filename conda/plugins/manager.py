@@ -833,11 +833,17 @@ class CondaPluginManager(pluggy.PluginManager):
             for hook in self.get_hook_results("post_transaction_actions")
         ]
     
-    def invoke_installers(self, env: Environment) -> dict[str, dict]:
-        # TODO:
-        # - loop thru all installers types and execute an install.
-        # - collect all the results
-        return {}
+    def invoke_installers(
+            self, env: Environment, prune: bool = False, dry_run: bool = False
+        ) -> dict[str, dict]:
+        result = {}
+        # Loop thru each installer and run them
+        for hook in self.get_hook_results("installers"):
+            if dry_run:
+                result[hook.name] = hook.dry_run(env, prune)
+            else:
+                result[hook.name] = hook.install(env, prune)
+        return result
     
     def get_installer(self, installer_type: str) -> CondaInstaller:
         """
