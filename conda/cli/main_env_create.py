@@ -171,7 +171,7 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
 
     if args.dry_run:
         installer_type = "conda"
-        installer = context.plugin_manager.get_installer(installer_type)
+        installer = get_installer(installer_type)
 
         pkg_specs = [*env.requested_packages, *args_packages]
 
@@ -182,14 +182,13 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
             print(solved_env.to_yaml(), end="")
 
     else:
+        # Install conda packages
         if args_packages:
             installer_type = "conda"
-            installer = context.plugin_manager.get_installer(installer_type)
+            installer = get_installer(installer_type)
             result[installer_type] = installer.install(prefix, args_packages, env.config, **cli_args)
-
-        # install conda packages
         installer_type = "conda"
-        installer = context.plugin_manager.get_installer(installer_type)
+        installer = get_installer(installer_type)
         result[installer_type] = installer.install(
             prefix, env.requested_packages, env.config, **cli_args
         )

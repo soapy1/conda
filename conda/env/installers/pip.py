@@ -60,11 +60,11 @@ def _pip_install_via_requirements(prefix, specs):
     return get_pip_installed_packages(stdout)
 
 
-def install(prefix: str, specs: list[str], config: EnvironmentConfig, **kwargs):
+def install(prefix: str, specs: list[str], *args, **kwargs):
     with get_spinner("Installing pip dependencies"):
         return _pip_install_via_requirements(prefix, specs)
 
 
-def dry_run(prefix: str, specs: list[str], config: EnvironmentConfig, **kwargs) -> dict:
+def dry_run(prefix: str, specs: list[str], *args, **kwargs) -> dict:
     print("pretending to (dry-run) install stuff with pip")
     return {}
