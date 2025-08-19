@@ -72,6 +72,7 @@ def configure_parser(sub_parsers: _SubParsersAction, **kwargs) -> ArgumentParser
     )
     p.add_argument(
         "-f",
+        "--env-file",
         "--file",
         action="store",
         help="Environment definition file (default: environment.yml)",

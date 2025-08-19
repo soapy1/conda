@@ -105,7 +105,7 @@ def add_parser_create_install_update(p, prefix_required=False):
     # want to gobble up all arguments after --file.
     p.add_argument(
         # "-f",  # FUTURE: 26.3: Enable this after deprecating alias in --force
-        "--file",
+        "--env-file", "--file",
         default=[],
         action="append",
         help="Read package versions from the given file. Repeated file "
