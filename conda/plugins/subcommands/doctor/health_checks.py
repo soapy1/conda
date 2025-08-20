@@ -13,6 +13,7 @@ from requests.exceptions import RequestException
 from ....base.constants import PREFIX_PINNED_FILE
 from ....base.context import context
 from ....common.io import dashlist
+from ....common.path import is_package_file
 from ....common.serialize import json, yaml_safe_dump
 from ....core.envs_manager import get_user_environments_txt_file
 from ....core.prefix_data import PrefixData
@@ -259,7 +260,7 @@ def pinned_well_formatted_check(prefix: str, verbose: bool) -> None:
     # If there are no pinned specs, exit early
     if not pinned_specs:
         print(
-            f"{OK_MARK} No pinned specs found in {prefix_data.prefix_path / PREFIX_PINNED_FILE}."
+            f"{OK_MARK} No pinned specs found in {prefix_data.prefix_path / PREFIX_PINNED_FILE}.\n"
         )
         return
 
@@ -279,8 +280,34 @@ def pinned_well_formatted_check(prefix: str, verbose: bool) -> None:
 
     # If there are no malformed packages, the pinned file is well formatted
     print(
-        f"{OK_MARK} The pinned file in {prefix_data.prefix_path / PREFIX_PINNED_FILE} seems well formatted."
+        f"{OK_MARK} The pinned file in {prefix_data.prefix_path / PREFIX_PINNED_FILE} seems well formatted.\n"
     )
+
+
+def conda_rc_settings_check(prefix: str, verbose: bool) -> None:
+    for context_source, source_config in context.collect_all().items():
+        if verbose:
+            print(f"Checking context source at {context_source}")
+        
+        config_errors = {}
+        if source_config.get("create_default_packages", None):
+            for pkg in source_config.get("create_default_packages"):
+                if is_package_file(pkg):
+                    config_errors[str(context_source)] = [f"`create_default_package` may not contain explicit package reference '{pkg}'"]
+    
+    if config_errors:
+        print(f"{X_MARK} The following errors were found in conda's config:")
+        print(
+            dashlist(
+                (f"{src}: {dashlist((err for err in errors), indent=8)}" for src, errors in config_errors.items()),
+                indent=4
+            )
+        )
+        print("\n")
+    else:
+        print(
+            f"{OK_MARK} The conda settings are ok.\n"
+        )
 
 
 @hookimpl
@@ -297,4 +324,8 @@ def conda_health_checks():
     yield CondaHealthCheck(
         name=f"{PREFIX_PINNED_FILE} Well Formatted Check",
         action=pinned_well_formatted_check,
+    )
+    yield CondaHealthCheck(
+        name=f"condarc settings are valid",
+        action=conda_rc_settings_check,
     )
