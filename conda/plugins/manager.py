@@ -41,6 +41,7 @@ from . import (
     virtual_packages,
 )
 from .config import PluginConfig
+from .environment_specifiers.environment_yml import ENVIRONMENT_YAML_PLUGIN_NAME
 from .hookspec import CondaSpecs, spec_name
 from .subcommands.doctor import health_checks
 
@@ -621,6 +622,14 @@ class CondaPluginManager(pluggy.PluginManager):
                 autodetect_disabled_plugins.append(hook_name)
 
         if not found:
+            # try the environment.yml as a last resort
+            try: 
+                plg = self.get_environment_specifier_by_name(source, ENVIRONMENT_YAML_PLUGIN_NAME)
+                if plg:
+                    return plg
+            except:
+                # let the EnvironmentSpecPluginNotDetected be raised
+                pass
             # raise error if no plugins found that can read the environment file
             raise EnvironmentSpecPluginNotDetected(
                 name=source,
