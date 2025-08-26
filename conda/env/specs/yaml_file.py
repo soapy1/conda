@@ -19,6 +19,9 @@ class YamlFileSpec(EnvironmentSpecBase):
     _environment = None
     extensions = {".yaml", ".yml"}
 
+    # Disable autodetection for this plugin
+    detection_supported = False
+
     def __init__(self, filename=None, **kwargs):
         self.filename = filename
         self.msg = None

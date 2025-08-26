@@ -9,7 +9,7 @@ from .. import hookimpl
 from ..types import CondaEnvironmentSpecifier
 
 
-@hookimpl(tryfirst=True)
+@hookimpl()
 def conda_environment_specifiers():
     from ...env.specs.yaml_file import YamlFileSpec
 
