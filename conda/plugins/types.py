@@ -590,3 +590,14 @@ class CondaEnvironmentExporter(CondaPlugin):
             raise PluginError(
                 f"Exactly one of export or multiplatform_export must be set for {self!r}"
             )
+
+@dataclass
+class CondaInstaller(CondaPlugin):
+    """
+    **EXPERIMENTAL**
+
+    Return type to use when defining a conda installer
+    """
+    name: str
+    install: Callable[[str, Iterable[str]], Action]
+    dry_run: Callable[[str, Iterable[str]], Action]

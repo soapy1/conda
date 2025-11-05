@@ -59,6 +59,7 @@ if TYPE_CHECKING:
         CondaEnvironmentExporter,
         CondaEnvironmentSpecifier,
         CondaHealthCheck,
+        CondaInstaller,
         CondaPostCommand,
         CondaPostSolve,
         CondaPostTransactionAction,
@@ -270,6 +271,9 @@ class CondaPluginManager(pluggy.PluginManager):
     def get_hook_results(
         self, name: Literal["environment_exporters"]
     ) -> list[CondaEnvironmentExporter]: ...
+
+    @overload
+    def get_hook_results(self, name: Literal["installers"]) -> list[CondaInstaller]: ...
 
     def get_hook_results(self, name, **kwargs):
         """
@@ -825,6 +829,34 @@ class CondaPluginManager(pluggy.PluginManager):
             )
             for hook in self.get_hook_results("post_transaction_actions")
         ]
+
+    def get_installers(self) -> dict[str, CondaInstaller]:
+        """
+        Returns a mapping from installer name to installer.
+        """
+        return {
+            hook.name: hook for hook in self.get_hook_results("installers")
+        }
+    
+    def get_installers_by_name(
+        self,
+        name: str,
+    ) -> CondaInstaller:
+        """Get an installer plugin by name
+
+        :param name: name of plugin to load
+        """
+        name = name.lower().strip()
+        plugins = self.get_installers()
+        try:
+            plugin = plugins[name]
+        except KeyError:
+            raise CondaValueError(
+                f"You have chosen an unrecognized installer"
+                f" specifier type ({name}). Choose one of: "
+                f"{dashlist(plugins)}"
+            )
+        return plugin
 
 
 @functools.cache
