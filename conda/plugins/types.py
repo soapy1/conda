@@ -599,5 +599,5 @@ class CondaInstaller(CondaPlugin):
     Return type to use when defining a conda installer
     """
     name: str
-    install: Callable[[str, Iterable[str]], Action]
-    dry_run: Callable[[str, Iterable[str]], Action]
+    install: Callable[[str, Iterable[str]], Iterable[Action]]
+    dry_run: Callable[[str, Iterable[str]], Iterable[Action]]

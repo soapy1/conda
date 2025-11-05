@@ -33,6 +33,7 @@ from ..exceptions import (
 from . import (
     environment_exporters,
     environment_specifiers,
+    installers,
     post_solves,
     prefix_data_loaders,
     reporter_backends,
@@ -872,6 +873,7 @@ def get_plugin_manager() -> CondaPluginManager:
         *virtual_packages.plugins,
         *subcommands.plugins,
         health_checks,
+        *installers.plugins,
         *post_solves.plugins,
         *reporter_backends.plugins,
         *prefix_data_loaders.plugins,
