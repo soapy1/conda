@@ -6,7 +6,7 @@ Creates new conda environments with the specified packages.
 """
 
 from __future__ import annotations
-
+import asyncio
 from logging import getLogger
 from typing import TYPE_CHECKING
 
@@ -167,7 +167,7 @@ def execute(args: Namespace, parser: ArgumentParser) -> int:
     if args.clone:
         install_clone(args, parser)
     else:
-        install(args, parser, "create")
+        asyncio.run(install(args, parser, "create"))
     # Run post-install steps applicable to all new environments
     prefix_data.set_nonadmin()
     print_activate(args.name or context.target_prefix)
