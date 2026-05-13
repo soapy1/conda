@@ -500,6 +500,7 @@ class RepodataSubset:
                                 shard,
                                 extra=extra,
                                 spec_to_package_name=self._spec_to_package_name,
+                                repodata_version=self._repodata_version,
                             ),
                         ),
                     )
