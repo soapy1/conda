@@ -19,6 +19,7 @@ import zstandard
 
 import conda.exceptions
 import conda.gateways.repodata
+from conda.base.constants import REPODATA_SHARDS_FN
 from conda.base.context import context
 from conda.core.subdir_data import SubdirData
 from conda.gateways.connection.session import get_session
@@ -214,7 +215,7 @@ def shard_mentioned_packages(
     extra: Iterable[str] = (),
     spec_to_package_name=spec_to_package_name,
     repodata_version: int = 1,
-) -> Iterable[str]:
+) -> Iterable[str, None]:
     """
     Return all dependency names mentioned in a shard, not including the shard's
     own package name. Additional names can be injected via ``extra`` and
@@ -554,9 +555,8 @@ def _repodata_shards(url, cache: RepodataCache) -> bytes:
         headers["If-None-Match"] = str(etag)
     if last_modified:
         headers["If-Modified-Since"] = str(last_modified)
-    filename = "repodata_shards.msgpack.zst"
 
-    with conda_http_errors(url, filename):
+    with conda_http_errors(url, REPODATA_SHARDS_FN):
         timeout = (
             context.remote_connect_timeout_secs,
             context.remote_read_timeout_secs,
@@ -640,7 +640,7 @@ def fetch_shards_index(sd: SubdirData) -> Shards | None:
     if cache_state.should_check_format("shards"):
         # look for shards index
         shards_data = None
-        shards_index_url = f"{sd.url_w_subdir}/repodata_shards.msgpack.zst"
+        shards_index_url = f"{sd.url_w_subdir}/{REPODATA_SHARDS_FN}"
 
         if not repo_cache.cache_path_shards.exists():
             # avoid 304 not modified if we don't have the file

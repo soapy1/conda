@@ -220,6 +220,8 @@ class RepodataSubset:
                 spec_to_package_name=self._spec_to_package_name,
                 repodata_version=self._repodata_version,
             ):
+                if package is None:
+                    continue
                 node_id = NodeId(package, shardlike.url)
 
                 if node_id not in self._nodes:
@@ -492,11 +494,13 @@ class RepodataSubset:
                 pending.update(
                     self._visit_node(
                         parent_node,
-                        shard_mentioned_packages(
-                            shard,
-                            extra=extra,
-                            spec_to_package_name=self._spec_to_package_name,
-                            repodata_version=self._repodata_version,
+                        filter(
+                            None,
+                            shard_mentioned_packages(
+                                shard,
+                                extra=extra,
+                                spec_to_package_name=self._spec_to_package_name,
+                            ),
                         ),
                     )
                 )
