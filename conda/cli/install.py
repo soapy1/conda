@@ -10,6 +10,9 @@ conda.cli.main_remove for the entry points into this module.
 
 from __future__ import annotations
 
+from rattler import install as rattler_install
+from rattler import RepoDataRecord, PackageRecord
+
 import os
 from logging import getLogger
 from os.path import abspath
@@ -282,8 +285,8 @@ def ensure_update_specs_exist(prefix: str, specs: list[str]):
         if not prefix_data.get(spec.name, None):
             raise PackageNotInstalledError(prefix, spec.name)
 
-
-def install(args, parser, command="install"):
+    
+async def install(args, parser, command="install"):
     """Logic for `conda install`, `conda update`, and `conda create`."""
     newenv = command == "create"
     isupdate = command == "update"
@@ -352,7 +355,7 @@ def install(args, parser, command="install"):
                 command=args.cmd,
             )
             try:
-                unlink_link_transaction = solver.solve_for_transaction(
+                solved_diff = solver.solve_for_diff(
                     deps_modifier=deps_modifier,
                     update_modifier=update_modifier,
                     force_reinstall=context.force_reinstall or context.force,
@@ -364,7 +367,7 @@ def install(args, parser, command="install"):
                 if not getattr(e, "allow_retry", True):
                     raise e
                 if _should_retry_unfrozen:
-                    unlink_link_transaction = solver.solve_for_transaction(
+                    solved_diff = solver.solve_for_diff(
                         deps_modifier=deps_modifier,
                         update_modifier=UpdateModifier.UPDATE_SPECS,
                         force_reinstall=context.force_reinstall or context.force,
@@ -392,7 +395,7 @@ def install(args, parser, command="install"):
                     raise CondaImportError(str(e))
                 raise e
 
-    handle_txn(unlink_link_transaction, prefix, args, newenv)
+    await handle_txn_for_diff(solved_diff, prefix, args, newenv)
 
     if env.external_packages and not context.dry_run and not context.download_only:
         from .. import CondaError
@@ -575,3 +578,47 @@ def handle_txn(unlink_link_transaction, prefix, args, newenv, remove_op=False):
     if context.json:
         actions = unlink_link_transaction._make_legacy_action_groups()[0]
         common.stdout_json_success(prefix=prefix, actions=actions)
+
+
+async def handle_txn_for_diff(solved_diff, prefix, args, newenv, remove_op=False):
+    # Note:
+    # - benchmark with --json output
+    # - doesn't do dry run, or download only
+    if newenv:
+        if context.subdir != context._native_subdir():
+            set_keys(
+                ("subdir", context.subdir),
+                path=Path(prefix, DEFAULT_CONDARC_FILENAME),
+            )
+
+    prefix_data = PrefixData(prefix)
+    installed = [
+        PackageRecord(
+             name=rec.name, version=rec.version, build=rec.build,
+             build_number=rec.build_number, subdir=rec.subdir, arch=None,
+             platform=None
+        )
+        for rec in prefix_data.iter_records()
+    ]
+
+    records_repodata_records = []
+    for rec in solved_diff[1]:
+        pkg_rec = PackageRecord(
+             name=rec.name, version=rec.version, build=rec.build,
+             build_number=rec.build_number, subdir=rec.subdir, arch=None,
+             platform=None
+        )
+        records_repodata_records.append(RepoDataRecord(
+            package_record=pkg_rec,
+            file_name=rec.url.split("/")[-1],
+            channel=str(rec.channel),
+            url=rec.url
+        ))
+    
+    await rattler_install(
+        records = records_repodata_records,
+        target_prefix=prefix,
+        installed_packages=installed,
+    )
+
+    
