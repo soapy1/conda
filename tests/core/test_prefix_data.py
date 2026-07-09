@@ -516,6 +516,39 @@ def test_prefix_insertion_error(
             )
 
 
+def test_insert_wheel_style_fn_uses_name_version_build(empty_env: Path) -> None:
+    """
+    Regression test for https://github.com/conda/conda/issues/16235
+    """
+    pkg_record = record(
+        name="pyqplot",
+        version="0.7.2",
+        build="py3_none_any_0",
+        build_number=0,
+        channel="conda-pypi",
+        fn="pyqplot-0.7.2-py3-none-any.whl",
+        url="https://pypi.org/pyqplot-0.7.2-py3-none-any.whl",
+        package_type=PackageType.VIRTUAL_PYTHON_WHEEL,
+    )
+
+    prefix_data = PrefixData(empty_env)
+    prefix_data.insert(pkg_record)
+
+    conda_meta_dir = empty_env / "conda-meta"
+    assert (conda_meta_dir / "pyqplot-0.7.2-py3_none_any_0.json").exists()
+
+    # The real symptom from #16235: on reload, a mismatched conda-meta
+    # filename fails the name-version-build check and the record is
+    # dropped instead of being loaded as a conda-managed package.
+    prefix_data.load()
+    reloaded = prefix_data.get("pyqplot")
+    assert reloaded.version == "0.7.2"
+    assert reloaded.build == "py3_none_any_0"
+
+    prefix_data.remove("pyqplot")
+    assert not (conda_meta_dir / "pyqplot-0.7.2-py3_none_any_0.json").exists()
+
+
 def test_get_conda_packages_returns_sorted_list(
     tmp_env: TmpEnvFixture, test_recipes_channel: str
 ):
