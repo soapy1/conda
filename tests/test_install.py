@@ -21,6 +21,9 @@ from conda.gateways.connection.download import download
 from conda.gateways.disk.delete import rm_rf
 from conda.gateways.disk.read import read_no_link, yield_lines
 from conda.models.enums import FileMode
+from conda.models.match_spec import MatchSpec
+from conda.resolve import Resolve
+from conda.testing import helpers
 
 if TYPE_CHECKING:
     from pytest import MonkeyPatch
@@ -264,3 +267,25 @@ def test_read_no_link(tmpdir):
     _make_lines_file(no_softlink)
     s2 = read_no_link(tempdir)
     assert s2 == {"line 1", "line 2", "line 4"}
+
+
+def test_pre_release_installs():
+    """An unpinned install can resolve to a pre-release from another channel.
+
+    Test for https://github.com/conda/conda-pypi/issues/421:
+    a channel (e.g. conda-pypi) publishing a pre-release build can outrank a
+    stable release of the same package from another channel, because the
+    resolver compares candidates purely by ``VersionOrder`` when it has no
+    channel priority information to break the tie -- unlike pip, which
+    excludes pre-releases from unpinned installs by default.
+    """
+    stable = helpers.record(name="param", version="2.3.2", channel="main")
+    pre_release = helpers.record(name="param", version="2.4.0rc3", channel="conda-pypi")
+
+    resolve = Resolve({stable: stable, pre_release: pre_release})
+    (installed,) = resolve.solve([MatchSpec("param")])
+
+    # today, conda has no notion of "final" vs "pre-release" versions: the
+    # highest VersionOrder wins even though it is a release candidate.
+    assert installed.version == "2.4.0rc3"
+    assert installed.channel.name == "conda-pypi"
