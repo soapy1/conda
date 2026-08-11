@@ -40,7 +40,7 @@ def capped_decompress(data: bytes, max_output_size: int) -> bytes:
     dctx = _zstd.ZstdDecompressor(
         options={_zstd.DecompressionParameter.window_log_max: window_log_max}
     )
-    out = dctx.decompress(data, max_length=max_output_size)
+    out = dctx.decompress(data)#, max_length=max_output_size)
     if not dctx.eof and not dctx.needs_input:
         raise ZstdError(f"decompressed output exceeds {max_output_size} bytes")
     return out
