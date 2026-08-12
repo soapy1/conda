@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from conda.base.context import context
+from conda.base.context import context, reset_context
 from conda.common.compat import on_win
 from conda.core.portability import _PaddingError, binary_replace, update_prefix
 from conda.gateways.connection.download import download
@@ -285,7 +285,87 @@ def test_pre_release_installs():
     resolve = Resolve({stable: stable, pre_release: pre_release})
     (installed,) = resolve.solve([MatchSpec("param")])
 
-    # today, conda has no notion of "final" vs "pre-release" versions: the
-    # highest VersionOrder wins even though it is a release candidate.
     assert installed.version == "2.4.0rc3"
+    assert installed.channel.name == "conda-pypi"
+
+
+def test_pre_release_installs_2(monkeypatch: MonkeyPatch):
+    """
+    Install param package which is available from 3 channels:
+    * conda-pypi
+    * conda-pypi/label/prerelease
+    * main
+
+    With strict channel priority, conda will try to install from the 
+    highest priority channel.
+    """
+    main_channel = helpers.record(name="param", version="2.3.2", channel="main")
+    pre_release_channel = helpers.record(name="param", version="2.4.0rc3", channel="conda-pypi/label/prerelease")
+    pypi_channel = helpers.record(name="param", version="2.3.2", channel="conda-pypi")
+
+    monkeypatch.setenv("CONDA_CHANNEL_PRIORITY", "strict")
+    reset_context()
+    
+    resolve = Resolve(
+        {pypi_channel: pypi_channel, pre_release_channel: pre_release_channel, main_channel: main_channel},
+        channels=["conda-pypi", "conda-pypi/label/prerelease", "main"]
+    )
+    (installed,) = resolve.solve([MatchSpec("param")])
+
+    assert installed.version == "2.3.2"
+    assert installed.channel.name == "conda-pypi"
+
+
+def test_pre_release_installs_3(monkeypatch: MonkeyPatch):
+    """
+    Install param package which is available from 3 channels:
+    * conda-pypi
+    * conda-pypi/label/prerelease
+    * main
+
+    With channel priority disabled, conda will choose the highest
+    version package, regardless of what channel it comes from.
+    """
+    main_channel = helpers.record(name="param", version="2.3.2", channel="main")
+    pre_release_channel = helpers.record(name="param", version="2.4.0rc3", channel="conda-pypi/label/prerelease")
+    pypi_channel = helpers.record(name="param", version="2.3.2", channel="conda-pypi")
+
+    monkeypatch.setenv("CONDA_CHANNEL_PRIORITY", "false")
+    reset_context()
+    
+    resolve = Resolve(
+        {pypi_channel: pypi_channel, pre_release_channel: pre_release_channel, main_channel: main_channel},
+        channels=["conda-pypi", "conda-pypi/label/prerelease", "main"]
+    )
+    (installed,) = resolve.solve([MatchSpec("param")])
+
+    assert installed.version == "2.4.0rc3"
+    assert installed.channel.name == "conda-pypi/label/prerelease"
+
+
+def test_pre_release_installs_4(monkeypatch: MonkeyPatch):
+    """
+    Install param package which is available from 3 channels:
+    * conda-pypi
+    * conda-pypi/label/prerelease
+    * main
+
+    With flexible channel priority, conda will prefer installing from
+    higher priority channels. It will only dip into lower priority
+    channels if there is a conflict or the package is not available.
+    """
+    main_channel = helpers.record(name="param", version="2.3.2", channel="main")
+    pre_release_channel = helpers.record(name="param", version="2.4.0rc3", channel="conda-pypi/label/prerelease")
+    pypi_channel = helpers.record(name="param", version="2.3.2", channel="conda-pypi")
+
+    monkeypatch.setenv("CONDA_CHANNEL_PRIORITY", "true")
+    reset_context()
+    
+    resolve = Resolve(
+        {pypi_channel: pypi_channel, pre_release_channel: pre_release_channel, main_channel: main_channel},
+        channels=["conda-pypi", "conda-pypi/label/prerelease", "main"]
+    )
+    (installed,) = resolve.solve([MatchSpec("param")])
+
+    assert installed.version == "2.3.2"
     assert installed.channel.name == "conda-pypi"
