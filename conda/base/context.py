@@ -74,6 +74,7 @@ from .constants import (
     SEARCH_PATH,
     UNKNOWN_CHANNEL,
     ChannelPriority,
+    PrereleaseChoice,
     DepsModifier,
     PathConflict,
     SafetyChecks,
@@ -389,6 +390,7 @@ class Context(Configuration):
         expandvars=True,
     )
     channel_priority = ParameterLoader(PrimitiveParameter(ChannelPriority.FLEXIBLE))
+    prerelease = ParameterLoader(PrimitiveParameter(PrereleaseChoice.ALLOW))
     _channels = ParameterLoader(
         SequenceParameter(PrimitiveParameter("", element_type=str), default=()),
         aliases=(
@@ -1286,6 +1288,7 @@ class Context(Configuration):
             "deps_modifier",
             "disallowed_packages",
             "pinned_packages",
+            "prerelease",
             "repodata_fns",
             "sat_solver",
             "solver",
@@ -1350,6 +1353,7 @@ class Context(Configuration):
             "force_reinstall",
             "pinned_packages",
             "prefix_data_interoperability",
+            "prerelease",
             "track_features",
             "solver",
         ),
@@ -2033,6 +2037,12 @@ class Context(Configuration):
             preview=dals(
                 """
                 List of preview features to opt into.
+                """
+            ),
+            prerelease=dals(
+                """
+                Accepts the options 'if-necessary', 'allow' and 'disallow'. Determines how
+                to include prerelease versions of packages in a solve.
                 """
             ),
             no_lock=dals(

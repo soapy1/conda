@@ -322,6 +322,13 @@ class ChannelPriority(ValueEnum, metaclass=ChannelPriorityMeta):
     FLEXIBLE = "flexible"
     DISABLED = "disabled"
 
+class PrereleaseChoice(ValueEnum):
+    __name__ = "PrereleaseChoice"
+
+    IF_NECESSARY = "if-necessary"
+    ALLOW = "allow"
+    DISALLOW = "disallow"
+
 
 class SatSolverChoice(ValueEnum):
     PYCOSAT = "pycosat"
