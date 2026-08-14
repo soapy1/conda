@@ -536,6 +536,22 @@ class VersionSpec(BaseSpec, metaclass=SingleStrArgCachingType):
         vspec_str, matcher, is_exact = self.get_matcher(vspec)
         super().__init__(vspec_str, matcher, is_exact)
 
+    def is_stable_version(self) -> bool:
+        """
+        Returns true if the version is a stable version. This includes
+        versions that do not include any pre-release components, dev or
+        post components.
+        """
+        if hasattr(self, "tup"):
+            # combination of specs joined by ',' (AND) or '|' (OR)
+            return all(spec.is_stable_version() for spec in self.tup)
+        if hasattr(self, "matcher_vo"):
+            # operator-based match (e.g. '==1.2.3', '>=1.2.3', '1.2.*')
+            return self.matcher_vo.is_stable_version()
+        # regex, wildcard, exact, or always-true matches don't reference
+        # a single concrete version, so don't treat them as pre-release
+        return True
+
     def get_matcher(self, vspec):
         if isinstance(vspec, str) and regex_split_re.match(vspec):
             vspec = treeify(vspec)

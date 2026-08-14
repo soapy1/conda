@@ -374,6 +374,9 @@ class MatchSpec(metaclass=MatchSpecType):
     def original_spec_str(self):
         return self._original_spec_str
 
+    def is_stable_version(self):
+        return self.version.is_stable_version()
+
     def match(self, rec: PackageRecord | dict[str, Any]) -> bool:
         """
         Accepts a `PackageRecord` or a dict, and matches can pull from any field
