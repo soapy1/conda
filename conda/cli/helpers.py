@@ -413,6 +413,30 @@ def add_parser_solver_mode(p: ArgumentParser) -> _ArgumentGroup:
         "Channel and per-package overrides can be set via channel_settings and "
         "exclude_newer_package in .condarc.",
     )
+    solver_mode_options.add_argument(
+        "--prerelease",
+        action="store_const",
+        dest="prerelease",
+        default=NULL,
+        const="allow",
+        help=SUPPRESS,
+    )
+    solver_mode_options.add_argument(
+        "--no-prerelease",
+        action="store_const",
+        dest="prerelease",
+        default=NULL,
+        const="disallow",
+        help="Disallow prerelease packages to be included in the solve."
+    )
+    solver_mode_options.add_argument(
+        "--if-necessary-prerelease",
+        action="store_const",
+        dest="prerelease",
+        default=NULL,
+        const="if-necessary",
+        help="Allow prerelease packages to be included in the solve if necessary."
+    )
     return solver_mode_options
 
 
