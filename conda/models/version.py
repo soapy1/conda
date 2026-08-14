@@ -322,6 +322,18 @@ class VersionOrder(metaclass=SingleStrArgCachingType):
     def __ge__(self, other: object) -> bool:
         return not (self < other)
 
+    def is_stable_version(self) -> bool:
+        """
+        Returns true if the version is a stable version. This includes
+        versions that do not include any pre-release components, dev or
+        post components.
+        """
+        return all(
+            isinstance(subcomponent, int)
+            for component in self.version
+            for subcomponent in component
+        )
+
 
 # each token slurps up leading whitespace, which we strip out.
 VSPEC_TOKENS = (
