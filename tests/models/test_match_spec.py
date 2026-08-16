@@ -2219,3 +2219,18 @@ def test_flags_serialization_is_sorted(match_spec_v3):
 )
 def test_parse_ecosystem_corpus(spec_str):
     MatchSpec(spec_str)
+
+
+@pytest.mark.parametrize(
+    "spec_str,expected",
+    [
+        ("foo", True),  # no version constraint at all
+        ("foo 1.2.3", True),
+        ("foo ==1.2.3", True),
+        ("foo 1.2.3rc1", False),
+        ("foo >=1.2.3rc1", False),
+        ("foo *", True),
+    ],
+)
+def test_match_spec_is_stable_version(spec_str, expected):
+    assert MatchSpec(spec_str).is_stable_version() is expected

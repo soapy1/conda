@@ -374,8 +374,8 @@ class MatchSpec(metaclass=MatchSpecType):
     def original_spec_str(self):
         return self._original_spec_str
 
-    def is_stable_version(self):
-        return self.version.is_stable_version()
+    def is_stable_version(self) -> bool:
+        return self.version is None or self.version.is_stable_version()
 
     def match(self, rec: PackageRecord | dict[str, Any]) -> bool:
         """

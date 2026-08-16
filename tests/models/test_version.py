@@ -434,3 +434,39 @@ def test_pep_440_arbitrary_equality_operator():
     # We're going to leave the not implemented for now.
     with pytest.raises(InvalidVersionSpec):
         VersionSpec("===3.3.2")
+
+
+@pytest.mark.parametrize(
+    "version,expected",
+    [
+        ("1.2.3", True),
+        ("1996.07.12", True),
+        ("1.2.3rc1", False),
+        ("1.2.3.dev0", False),
+        ("1.2.3.post1", False),
+        ("1.1.parallel", False),
+    ],
+)
+def test_version_order_is_stable_version(version, expected):
+    assert VersionOrder(version).is_stable_version() is expected
+
+
+@pytest.mark.parametrize(
+    "spec_str,expected",
+    [
+        ("1.2.3", True),
+        ("==1.2.3", True),
+        ("1.2.3rc1", False),
+        ("==1.2.0rc1", False),
+        (">=1.2.3", True),
+        (">=1.2.0rc1", False),
+        ("1.2.*", True),
+        ("*", True),
+        (">=1.0,<2.0", True),
+        (">=1.0,<2.0rc1", False),
+        ("1.0|2.0rc1", False),
+        ("1.0|2.0", True),
+    ],
+)
+def test_version_spec_is_stable_version(spec_str, expected):
+    assert VersionSpec(spec_str).is_stable_version() is expected

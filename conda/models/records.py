@@ -37,6 +37,7 @@ from ..exceptions import PathNotFoundError
 from .channel import Channel
 from .enums import FileMode, LinkType, NoarchType, PackageType, PathEnum, Platform
 from .match_spec import MatchSpec
+from .version import VersionOrder
 
 
 class LinkTypeField(EnumField):
@@ -434,6 +435,13 @@ class PackageRecord(DictSafeMixin, Entity):
     @property
     def is_unmanageable(self):
         return self.package_type in PackageType.unmanageable_package_types()
+
+    @property
+    def is_stable_version(self) -> bool:
+        """True if the package's version is a stable version (no pre-release, dev, or
+        post components).
+        """
+        return VersionOrder(self.version).is_stable_version()
 
     timestamp = TimestampField()
 

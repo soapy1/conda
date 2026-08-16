@@ -79,6 +79,20 @@ def test_package_record_timestamp():
     assert rec.dump()["timestamp"] == ts_millis
 
 
+@pytest.mark.parametrize(
+    "version,expected",
+    [
+        ("1.2.3", True),
+        ("1.2.3rc1", False),
+        ("1.2.3.dev0", False),
+        ("1.2.3.post1", False),
+    ],
+)
+def test_package_record_is_stable_version(version, expected):
+    rec = PackageRecord(name="test-package", version=version, build="0", build_number=0)
+    assert rec.is_stable_version is expected
+
+
 def test_package_record_feature():
     feature_name = "test_feature_name"
     package_name = f"{feature_name}@"

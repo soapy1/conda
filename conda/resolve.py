@@ -17,7 +17,12 @@ from frozendict import frozendict
 from tqdm import tqdm
 
 from .auxlib.decorators import memoizemethod
-from .base.constants import MAX_CHANNEL_PRIORITY, ChannelPriority, SatSolverChoice
+from .base.constants import (
+    MAX_CHANNEL_PRIORITY,
+    ChannelPriority,
+    PrereleaseChoice,
+    SatSolverChoice,
+)
 from .base.context import context
 from .common.compat import on_win
 from .common.io import dashlist, time_recorder
@@ -41,7 +46,7 @@ from .exceptions import (
 from .models.channel import Channel
 from .models.enums import NoarchType, PackageType
 from .models.match_spec import MatchSpec
-from .models.records import PackageRecord
+from .models.records import PackageRecord, PrefixRecord
 from .models.version import VersionOrder
 
 if TYPE_CHECKING:
@@ -681,8 +686,9 @@ class Resolve:
         self, explicit_specs, sort_by_exactness=True, exit_on_conflict=False
     ):
         strict_channel_priority = context.channel_priority == ChannelPriority.STRICT
+        disallow_prereleases = context.prerelease == PrereleaseChoice.DISALLOW
 
-        cache_key = strict_channel_priority, tuple(explicit_specs)
+        cache_key = strict_channel_priority, disallow_prereleases, tuple(explicit_specs)
         if cache_key in self._reduced_index_cache:
             return self._reduced_index_cache[cache_key]
 
@@ -729,6 +735,17 @@ class Resolve:
                     if prec.channel.name != sole_source_channel_name:
                         filter_out[prec] = "removed due to strict channel priority"
                 cp_filter_applied.add(name)
+
+            # exclude prerelease versions, unless already installed or a virtual
+            # package (e.g. __conda's placeholder dev version isn't a real release)
+            if group and disallow_prereleases:
+                for prec in group:
+                    if (
+                        not isinstance(prec, PrefixRecord)
+                        and not prec.is_unmanageable
+                        and not prec.is_stable_version
+                    ):
+                        filter_out[prec] = "excluding prerelease version"
 
             # Prune packages that don't match any of the patterns,
             # have unsatisfiable dependencies, or conflict with the explicit specs
@@ -1161,6 +1178,14 @@ class Resolve:
 
         sdict = {}  # dict[package_name, PackageRecord]
 
+        # bias the minimizer away from prerelease versions, unless they're the
+        # only way to satisfy the specs (PrereleaseChoice.IF_NECESSARY) or are
+        # already installed. PrereleaseChoice.DISALLOW is enforced by excluding
+        # prereleases from the reduced index entirely; this penalty acts as a
+        # backstop in case any slip through (e.g. dependency-only candidates).
+        prerelease_penalty = (
+            100 if context.prerelease != PrereleaseChoice.ALLOW else 0
+        )
         for s in specs:
             s = MatchSpec(s)  # needed for testing
             sdict.setdefault(s.name, [])
@@ -1202,17 +1227,26 @@ class Resolve:
                 elif not self._solver_ignore_timestamps and pkey[5] != version_key[5]:
                     it += 1
 
+                pp = 0
+                if (
+                    prerelease_penalty
+                    and not isinstance(prec, PrefixRecord)
+                    and not prec.is_unmanageable
+                    and not prec.is_stable_version
+                ):
+                    pp = prerelease_penalty
+
                 prec_sat_name = self.to_sat_name(prec)
-                if ic or include0:
-                    eqc[prec_sat_name] = ic
-                if iv or include0:
-                    eqv[prec_sat_name] = iv
-                if ib or include0:
-                    eqb[prec_sat_name] = ib
-                if ia or include0:
-                    eqa[prec_sat_name] = ia
-                if it or include0:
-                    eqt[prec_sat_name] = it
+                if ic or pp or include0:
+                    eqc[prec_sat_name] = ic + pp
+                if iv or pp or include0:
+                    eqv[prec_sat_name] = iv + pp
+                if ib or pp or include0:
+                    eqb[prec_sat_name] = ib + pp
+                if ia or pp or include0:
+                    eqa[prec_sat_name] = ia + pp
+                if it or pp or include0:
+                    eqt[prec_sat_name] = it + pp
                 pkey = version_key
 
         return eqc, eqv, eqb, eqa, eqt
