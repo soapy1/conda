@@ -43,7 +43,7 @@ def execute(args: Namespace) -> int:
         ("Hooks", ", ".join(plugin["hooks"]) or "None"),
         ("Summary", plugin["summary"]),
         ("License", plugin["license"]),
-        ("Homepage", plugin["homepage"]),
+        ("Urls", ", ".join(plugin["urls"]) or "None"),
     )
     label_width = max(len(label) for label, _value in fields)
     for label, value in fields:

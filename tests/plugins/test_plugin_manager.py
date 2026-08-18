@@ -120,7 +120,7 @@ def test_plugins_info_json(
         "hooks": ["solvers"],
         "summary": "A test plugin",
         "license": "",
-        "homepage": "",
+        "urls": [],
     }
     assert not err
 

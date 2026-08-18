@@ -281,7 +281,7 @@ class CondaPluginManager(pluggy.PluginManager):
                 "hooks": self.get_plugin_hook_names(plugin),
                 "summary": self._get_plugin_metadata(dist, "Summary"),
                 "license": self._get_plugin_metadata(dist, "License"),
-                "homepage": self._get_plugin_homepage(dist),
+                "urls": self._get_plugin_urls(dist),
             }
 
         raise CondaValueError(f"No installed conda plugin found matching '{name}'.")
@@ -304,21 +304,18 @@ class CondaPluginManager(pluggy.PluginManager):
         return metadata.get(field, "") or ""
 
     @classmethod
-    def _get_plugin_homepage(cls, dist: DistFacade) -> str:
+    def _get_plugin_urls(cls, dist: DistFacade) -> list[str]:
+        urls = []
         metadata = cls._get_plugin_distribution_metadata(dist)
         if metadata is None:
-            return ""
-
-        homepage = metadata.get("Home-page", "") or ""
-        if homepage:
-            return homepage
+            return urls
 
         for project_url in metadata.get_all("Project-URL") or ():
-            label, separator, url = project_url.partition(",")
-            if separator and label.strip().lower() in {"home-page", "homepage"}:
-                return url.strip()
+            _, separator, url = project_url.partition(",")
+            if separator:
+                urls.append(url.strip())
 
-        return ""
+        return urls
 
     def register(self, plugin, name: str | None = None) -> str | None:
         """

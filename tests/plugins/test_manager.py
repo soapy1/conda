@@ -183,7 +183,7 @@ def test_get_installed_plugin_info(name: str, plugin_manager: CondaPluginManager
         "hooks": ["solvers"],
         "summary": "A test plugin",
         "license": "",
-        "homepage": "",
+        "urls": [],
     }
 
 
