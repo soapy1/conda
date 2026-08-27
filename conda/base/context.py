@@ -391,6 +391,10 @@ class Context(Configuration):
     )
     channel_priority = ParameterLoader(PrimitiveParameter(ChannelPriority.FLEXIBLE))
     prerelease = ParameterLoader(PrimitiveParameter(PrereleaseChoice.ALLOW))
+    prerelease_package = ParameterLoader(
+        MapParameter(PrimitiveParameter("", element_type=str)), expandvars=True
+    )
+
     _channels = ParameterLoader(
         SequenceParameter(PrimitiveParameter("", element_type=str), default=()),
         aliases=(
@@ -2043,6 +2047,12 @@ class Context(Configuration):
                 """
                 Accepts the options 'if-necessary', 'allow' and 'disallow'. Determines how
                 to include prerelease versions of packages in a solve.
+                """
+            ),
+            prerelease_package=dals(
+                """
+                Accepts the options 'if-necessary', 'allow' and 'disallow'. Determines how
+                to include prerelease versions of a specific package in a solve.
                 """
             ),
             no_lock=dals(
