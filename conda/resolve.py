@@ -663,6 +663,15 @@ class Resolve:
                 ]
         return channel_name
 
+    @staticmethod
+    def _prerelease_choice(package_name):
+        # a per-package prerelease setting overrides the global `prerelease`
+        # setting; falls back to the global setting when unset for this package
+        package_setting = context.prerelease_package.get(package_name)
+        if package_setting:
+            return PrereleaseChoice(package_setting)
+        return context.prerelease
+
     @memoizemethod
     def _broader(self, ms, specs_by_name):
         """Prevent introduction of matchspecs that broaden our selection of choices."""
@@ -686,9 +695,12 @@ class Resolve:
         self, explicit_specs, sort_by_exactness=True, exit_on_conflict=False
     ):
         strict_channel_priority = context.channel_priority == ChannelPriority.STRICT
-        disallow_prereleases = context.prerelease == PrereleaseChoice.DISALLOW
+        prerelease_settings = (
+            context.prerelease,
+            tuple(sorted(context.prerelease_package.items())),
+        )
 
-        cache_key = strict_channel_priority, disallow_prereleases, tuple(explicit_specs)
+        cache_key = strict_channel_priority, prerelease_settings, tuple(explicit_specs)
         if cache_key in self._reduced_index_cache:
             return self._reduced_index_cache[cache_key]
 
@@ -738,7 +750,7 @@ class Resolve:
 
             # exclude prerelease versions, unless already installed or a virtual
             # package (e.g. __conda's placeholder dev version isn't a real release)
-            if group and disallow_prereleases:
+            if group and self._prerelease_choice(name) == PrereleaseChoice.DISALLOW:
                 for prec in group:
                     if (
                         not isinstance(prec, PrefixRecord)
@@ -1178,14 +1190,6 @@ class Resolve:
 
         sdict = {}  # dict[package_name, PackageRecord]
 
-        # bias the minimizer away from prerelease versions, unless they're the
-        # only way to satisfy the specs (PrereleaseChoice.IF_NECESSARY) or are
-        # already installed. PrereleaseChoice.DISALLOW is enforced by excluding
-        # prereleases from the reduced index entirely; this penalty acts as a
-        # backstop in case any slip through (e.g. dependency-only candidates).
-        prerelease_penalty = (
-            100 if context.prerelease != PrereleaseChoice.ALLOW else 0
-        )
         for s in specs:
             s = MatchSpec(s)  # needed for testing
             sdict.setdefault(s.name, [])
@@ -1198,6 +1202,14 @@ class Resolve:
             #             rec.append(dist)
 
         for name, targets in sdict.items():
+            # bias the minimizer away from prerelease versions, unless they're the
+            # only way to satisfy the specs (PrereleaseChoice.IF_NECESSARY) or are
+            # already installed. PrereleaseChoice.DISALLOW is enforced by excluding
+            # prereleases from the reduced index entirely; this penalty acts as a
+            # backstop in case any slip through (e.g. dependency-only candidates).
+            prerelease_penalty = (
+                100 if self._prerelease_choice(name) != PrereleaseChoice.ALLOW else 0
+            )
             pkgs = [(self.version_key(p), p) for p in self.groups.get(name, [])]
             pkey = None
             # keep in mind that pkgs is already sorted according to version_key (a tuple,
