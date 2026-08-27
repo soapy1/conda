@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from conda.base.context import reset_context
+from conda.base.context import reset_context, context
 from conda.common.compat import on_win
 from conda.exceptions import UnsatisfiableError
 from conda.exports import get_index
@@ -16,6 +16,8 @@ from conda.models.records import PackageRecord, PrefixRecord
 from conda.resolve import Resolve
 from conda.testing import helpers
 from conda.testing.helpers import TEST_DATA_DIR
+
+from conda.common.configuration import DefaultValueRawParameter
 
 if TYPE_CHECKING:
     from pytest_mock import MockerFixture
@@ -148,6 +150,65 @@ class TestPrereleaseHandling:
         # core/solve.py adds a bare MatchSpec for every virtual package present
         # in the index so the solver accounts for it; reproduce that here.
         result = resolve.solve(["foo", "__conda"])
+        assert [str(prec.version) for prec in result] == ["1.1.0"]
+
+    def test_prerelease_package_allow(self):
+        reset_context()
+        raw_data = {"prerelease_package": {"foo": "allow"}}
+        rd = {
+            "testdata": DefaultValueRawParameter.make_raw_parameters("testdata", raw_data)
+        }
+        context._set_raw_data(rd)
+        resolve = Resolve(self._index(["1.0.0", "1.1.0", "1.2.0rc1"]))
+        result = resolve.solve(["foo"])
+        assert [str(prec.version) for prec in result] == ["1.2.0rc1"]
+
+    def test_prerelease_package_disallow(self):
+        reset_context()
+        raw_data = {"prerelease_package": {"foo": "disallow"}}
+        rd = {
+            "testdata": DefaultValueRawParameter.make_raw_parameters("testdata", raw_data)
+        }
+        context._set_raw_data(rd)
+        resolve = Resolve(self._index(["1.0.0", "1.1.0", "1.2.0rc1"]))
+        result = resolve.solve(["foo"])
+        assert [str(prec.version) for prec in result] == ["1.1.0"]
+
+    def test_prerelease_package_only_effects_package(self):
+        reset_context()
+        raw_data = {"prerelease_package": {"bob": "disallow"}}
+        rd = {
+            "testdata": DefaultValueRawParameter.make_raw_parameters("testdata", raw_data)
+        }
+        context._set_raw_data(rd)
+        resolve = Resolve(self._index(["1.0.0", "1.1.0", "1.2.0rc1"]))
+        result = resolve.solve(["foo"])
+        assert [str(prec.version) for prec in result] == ["1.2.0rc1"]
+
+    def test_prerelease_package_higher_priority_than_prerelease_one(self, monkeypatch):
+        monkeypatch.setenv("CONDA_PRERELEASE", "disallow")
+        reset_context()
+        raw_data = {"prerelease_package": {"foo": "allow"}}
+        rd = {
+            "testdata": DefaultValueRawParameter.make_raw_parameters("testdata", raw_data)
+        }
+        context._set_raw_data(rd)
+
+        resolve = Resolve(self._index(["1.0.0", "1.1.0", "1.2.0rc1"]))
+        result = resolve.solve(["foo"])
+        assert [str(prec.version) for prec in result] == ["1.2.0rc1"]
+
+    def test_prerelease_package_higher_priority_than_prerelease_two(self, monkeypatch):
+        monkeypatch.setenv("CONDA_PRERELEASE", "allow")
+        reset_context()
+        raw_data = {"prerelease_package": {"foo": "disallow"}}
+        rd = {
+            "testdata": DefaultValueRawParameter.make_raw_parameters("testdata", raw_data)
+        }
+        context._set_raw_data(rd)
+    
+        resolve = Resolve(self._index(["1.0.0", "1.1.0", "1.2.0rc1"]))
+        result = resolve.solve(["foo"])
         assert [str(prec.version) for prec in result] == ["1.1.0"]
 
 
