@@ -399,7 +399,7 @@ class Context(Configuration):
         expandvars=True,
     )
     channel_priority = ParameterLoader(PrimitiveParameter(ChannelPriority.FLEXIBLE))
-    prerelease = ParameterLoader(PrimitiveParameter(PrereleaseChoice.ALLOW))
+    prerelease = ParameterLoader(PrimitiveParameter(PrereleaseChoice.DISALLOW))
     _channels = ParameterLoader(
         SequenceParameter(PrimitiveParameter("", element_type=str), default=()),
         aliases=(
