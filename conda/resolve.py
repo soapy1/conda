@@ -17,7 +17,12 @@ from frozendict import frozendict
 from tqdm import tqdm
 
 from .auxlib.decorators import memoizemethod
-from .base.constants import MAX_CHANNEL_PRIORITY, ChannelPriority, SatSolverChoice
+from .base.constants import (
+    MAX_CHANNEL_PRIORITY,
+    ChannelPriority,
+    PrereleaseChoice,
+    SatSolverChoice,
+)
 from .base.context import context
 from .common.compat import on_win
 from .common.io import dashlist, time_recorder
@@ -1150,6 +1155,12 @@ class Resolve:
     def generate_package_count(self, C, missing):
         return {self.push_MatchSpec(C, nm): 1 for nm in missing}
 
+    @staticmethod
+    def _needs_prerelease(prec) -> bool:
+        # packages opt into being gated by the `prerelease` setting by depending
+        # on the `__prerelease` virtual package (see conda.plugins.virtual_packages.prerelease)
+        return any(MatchSpec(dep).name == "__prerelease" for dep in prec.depends)
+
     def generate_version_metrics(self, C, specs, include0=False):
         # each of these are weights saying how well packages match the specs
         #    format for each: a C.minimize() objective: dict[varname, coeff]
@@ -1160,6 +1171,12 @@ class Resolve:
         eqt = {}  # timestamp
 
         sdict = {}  # dict[package_name, PackageRecord]
+
+        # `if-necessary` should only fall back to a prerelease when no stable
+        # candidate can satisfy the specs, so bias the solver away from them here
+        # rather than excluding them outright (as `disallow` does via the reduced
+        # index); `allow` should apply no bias at all.
+        penalize_prereleases = context.prerelease != PrereleaseChoice.ALLOW
 
         for s in specs:
             s = MatchSpec(s)  # needed for testing
@@ -1202,17 +1219,23 @@ class Resolve:
                 elif not self._solver_ignore_timestamps and pkey[5] != version_key[5]:
                     it += 1
 
+                pp = (
+                    100
+                    if penalize_prereleases and self._needs_prerelease(prec)
+                    else 0
+                )
+
                 prec_sat_name = self.to_sat_name(prec)
-                if ic or include0:
-                    eqc[prec_sat_name] = ic
-                if iv or include0:
-                    eqv[prec_sat_name] = iv
-                if ib or include0:
-                    eqb[prec_sat_name] = ib
-                if ia or include0:
-                    eqa[prec_sat_name] = ia
-                if it or include0:
-                    eqt[prec_sat_name] = it
+                if ic or pp or include0:
+                    eqc[prec_sat_name] = ic + pp
+                if iv or pp or include0:
+                    eqv[prec_sat_name] = iv + pp
+                if ib or pp or include0:
+                    eqb[prec_sat_name] = ib + pp
+                if ia or pp or include0:
+                    eqa[prec_sat_name] = ia + pp
+                if it or pp or include0:
+                    eqt[prec_sat_name] = it + pp
                 pkey = version_key
 
         return eqc, eqv, eqb, eqa, eqt
