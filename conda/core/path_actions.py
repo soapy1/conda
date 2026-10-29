@@ -1563,11 +1563,6 @@ class ExtractPackageAction(PathAction):
                 self.record_or_spec, raw_index_json
             )
 
-        repodata_record_path = join(
-            self.target_full_path, "info", "repodata_record.json"
-        )
-        write_as_json_to_file(repodata_record_path, repodata_record)
-
         target_package_cache = PackageCacheData(self.target_pkgs_dir)
         package_cache_record = PackageCacheRecord.from_objects(
             repodata_record,
