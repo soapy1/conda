@@ -43,7 +43,8 @@ from ..common.path import expand, strip_pkg_extension, url_to_path
 from ..common.serialize import json
 from ..common.signals import signal_handler
 from ..common.terminal import is_tty, term_dumb
-from ..common.url import path_to_url
+from ..common.url import path_to_url, mask_anaconda_token
+from ..common.url import remove_auth as url_remove_auth
 from ..exceptions import NotWritableError, NoWritablePkgsDirError, PluginError
 from ..gateways.disk.create import (
     create_package_cache_directory,
@@ -146,12 +147,17 @@ class PackageCacheData(metaclass=PackageCacheType):
 
         self._urls_data = UrlsData(pkgs_dir)
 
-    def insert(self, package_cache_record):
+    def insert(self, package_cache_record, remove_auth: bool = True):
         meta = join(
             package_cache_record.extracted_package_dir, "info", "repodata_record.json"
         )
-        # import pdb; pdb.set_trace()
-        write_as_json_to_file(meta, PackageRecord.from_objects(package_cache_record))
+        package_record = PackageRecord.from_objects(package_cache_record)
+        if remove_auth:
+            package_record.url = url_remove_auth(
+                mask_anaconda_token(package_record.url)
+            )
+
+        write_as_json_to_file(meta, package_record)
 
         self._package_cache_records[package_cache_record] = package_cache_record
 
