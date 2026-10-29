@@ -28,7 +28,7 @@ from ..gateways.disk.delete import rm_rf
 from ..gateways.disk.read import lexists
 from ..history import History
 from ..models.channel import Channel
-from ..models.records import PackageRecord, PrefixRecord
+from ..models.records import PackageRecord, PrefixRecord, PackageCacheRecord
 from ..resolve import Resolve
 
 # The default value will only work if we have installed conda in development mode!
@@ -480,6 +480,32 @@ def record(
         build_number=build_number,
         timestamp=timestamp,
         channel=channel,
+        **kwargs,
+    )
+
+def package_cache_record(
+    name="a",
+    version="1.0",
+    depends=None,
+    build="0",
+    build_number=0,
+    timestamp=0,
+    channel=None,
+    tmp_dir=None,
+    **kwargs,
+):
+    tarball = f"{name}-{version}-{build}.conda"
+    kwargs.setdefault("fn", tarball)
+    return PackageCacheRecord(
+        name=name,
+        version=version,
+        depends=depends or [],
+        build=build,
+        build_number=build_number,
+        timestamp=timestamp,
+        channel=channel,
+        extracted_package_dir=f"{tmp_dir}/{name}-{version}-{build}",
+        package_tarball_full_path=f"{tmp_dir}/{tarball}",
         **kwargs,
     )
 

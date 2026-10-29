@@ -150,6 +150,7 @@ class PackageCacheData(metaclass=PackageCacheType):
         meta = join(
             package_cache_record.extracted_package_dir, "info", "repodata_record.json"
         )
+        # import pdb; pdb.set_trace()
         write_as_json_to_file(meta, PackageRecord.from_objects(package_cache_record))
 
         self._package_cache_records[package_cache_record] = package_cache_record

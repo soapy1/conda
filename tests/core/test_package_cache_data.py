@@ -1,13 +1,18 @@
 # Copyright (C) 2012 Anaconda, Inc
 # SPDX-License-Identifier: BSD-3-Clause
+from __future__ import annotations
+
+import base64
 import datetime
 import json
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from os.path import abspath, basename, dirname, join
 from pathlib import Path
-from threading import Event
+from threading import Event, Thread
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import pytest
 from pytest import MonkeyPatch
@@ -26,14 +31,19 @@ from conda.core.package_cache_data import (
     ProgressiveFetchExtract,
 )
 from conda.core.path_actions import CacheUrlAction
+from conda.core.subdir_data import SubdirData
 from conda.gateways.disk.create import copy
 from conda.gateways.disk.permissions import make_read_only
 from conda.gateways.disk.read import isfile, listdir, yield_lines
 from conda.models.enums import LinkType
+from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PrefixRecord
-from conda.testing.helpers import CHANNEL_DIR_V1
+from conda.testing.helpers import CHANNEL_DIR_V1, package_cache_record
 from conda.utils import url_path
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 assert CHANNEL_DIR_V1 == abspath(
     join(dirname(__file__), "..", "data", "conda_format_repo")
@@ -1081,3 +1091,115 @@ def test_cover_extract_bad_package(tmp_path):
     with open(fullpath, "w") as archive:
         archive.write("")
     PackageCacheData.first_writable()._make_single_record(str(fullpath))
+
+
+AUTH_USER = "conda-user"
+AUTH_PASSWORD = "conda-password"
+AUTH_TOKEN = "xx-00000000-0000-0000-0000-000000000000"
+
+
+@pytest.fixture
+def auth_channel_server() -> Iterator[str]:
+    """Serve CHANNEL_DIR_V1 and reject requests without basic auth or a /t/<token>/ prefix."""
+    basic = base64.b64encode(f"{AUTH_USER}:{AUTH_PASSWORD}".encode()).decode()
+    token_prefix = f"/t/{AUTH_TOKEN}"
+
+    class AuthHandler(SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=CHANNEL_DIR_V1, **kwargs)
+
+        def _authorized(self) -> bool:
+            if self.path.startswith(f"{token_prefix}/"):
+                self.path = self.path[len(token_prefix) :]
+                return True
+            return self.headers.get("Authorization") == f"Basic {basic}"
+
+        def do_HEAD(self):
+            if self._authorized():
+                return super().do_HEAD()
+            self.send_error(401)
+
+        def do_GET(self):
+            if self._authorized():
+                return super().do_GET()
+            self.send_error(401)
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), AuthHandler)
+    Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        yield f"127.0.0.1:{server.server_address[1]}"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+@pytest.mark.integration
+@pytest.mark.parametrize(
+    "credentials,secrets",
+    [
+        pytest.param(
+            f"{AUTH_USER}:{AUTH_PASSWORD}@", (AUTH_USER, AUTH_PASSWORD), id="basic-auth"
+        ),
+        pytest.param(f"t/{AUTH_TOKEN}/", (AUTH_TOKEN,), id="token"),
+    ],
+)
+@pytest.mark.usefixtures("clear_cache")
+def test_repodata_record_url_has_no_credentials(
+    tmp_pkgs_dir: Path,
+    auth_channel_server: str,
+    credentials: str,
+    secrets: tuple[str, ...],
+):
+    """Packages fetched from a channel with credentials don't write them to the cache."""
+    if credentials.startswith("t/"):
+        channel_url = f"http://{auth_channel_server}/{credentials}{subdir}"
+    else:
+        channel_url = f"http://{credentials}{auth_channel_server}/{subdir}"
+    records = SubdirData(Channel(channel_url)).query("zlib")
+    conda_prec = next(rec for rec in records if rec.fn == zlib_conda_fn)
+
+    # the server rejects unauthenticated requests, so this only succeeds with credentials
+    ProgressiveFetchExtract((conda_prec,)).execute()
+
+    repodata_record_path = tmp_pkgs_dir / zlib_base_fn / "info" / "repodata_record.json"
+    for secret in secrets:
+        assert secret not in repodata_record_path.read_text()
+
+
+@pytest.mark.parametrize("remove_auth", (True, False))
+def test_no_tokens_dumped(tmp_path: Path, remove_auth: bool):
+    pkg_record = package_cache_record(
+        channel="fake",
+        url="https://conda.anaconda.org/t/some-fake-token/fake/noarch/a-1.0-0.tar.bz2",
+        tmp_dir=tmp_path
+    )
+    pcd = PackageCacheData(tmp_path)
+    extracted_package_info =  (tmp_path / "a-1.0-0" / "info" )
+    extracted_package_info.mkdir(parents=True, exist_ok=True)
+
+    pcd.insert(pkg_record, remove_auth=remove_auth)
+
+    json_content = (extracted_package_info / "repodata_record.json").read_text()
+    if remove_auth:
+        assert "/t/<TOKEN>/" in json_content
+    else:
+        assert "/t/some-fake-token/" in json_content
+
+@pytest.mark.parametrize("remove_auth", (True, False))
+def test_no_auth_dumped(tmp_path: Path, remove_auth: bool):
+    pkg_record = package_cache_record(
+        channel="fake",
+        url="https://user:password@conda.anaconda.org/fake/noarch/a-1.0-0.tar.bz2",
+        tmp_dir=tmp_path
+    )
+    pcd = PackageCacheData(tmp_path)
+    extracted_package_info =  (tmp_path / "a-1.0-0" / "info" )
+    extracted_package_info.mkdir(parents=True, exist_ok=True)
+
+    pcd.insert(pkg_record, remove_auth=remove_auth)
+
+    json_content = (extracted_package_info / "repodata_record.json").read_text()
+    if remove_auth:
+        assert "user:password@conda.anaconda.org" not in json_content
+    else:
+        assert "user:password@conda.anaconda.org" in json_content
