@@ -10,6 +10,13 @@ from typing import TYPE_CHECKING
 import pytest
 import requests
 
+from conda.testing.http_test_server import (
+    AUTH_PASSWORD,
+    AUTH_TOKEN,
+    AUTH_USER,
+    run_test_server,
+)
+
 if TYPE_CHECKING:
     from conda.testing.fixtures import HttpTestServerFixture
 
@@ -141,3 +148,25 @@ def test_marker_validation_directory_type():
     # This is tested implicitly through the other tests
     # If marker accepts invalid types, those tests would fail
     pass
+
+
+@pytest.mark.parametrize(
+    "path,auth,expected",
+    [
+        pytest.param("simple.yml", None, 401, id="no-auth"),
+        pytest.param("simple.yml", (AUTH_USER, AUTH_PASSWORD), 200, id="basic-auth"),
+        pytest.param("simple.yml", (AUTH_USER, "wrong"), 401, id="bad-password"),
+        pytest.param(f"t/{AUTH_TOKEN}/simple.yml", None, 200, id="token"),
+        pytest.param("t/wrong-token/simple.yml", None, 401, id="bad-token"),
+    ],
+)
+def test_run_test_server_enable_auth(
+    path: str, auth: tuple[str, str] | None, expected: int
+):
+    """Should only serve requests with basic auth or a /t/<token>/ prefix."""
+    server = run_test_server("tests/env/support", enable_auth=True)
+    try:
+        url = f"http://127.0.0.1:{server.server_address[1]}/{path}"
+        assert requests.get(url, auth=auth).status_code == expected
+    finally:
+        server.shutdown()

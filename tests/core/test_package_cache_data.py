@@ -2,15 +2,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
 from __future__ import annotations
 
-import base64
 import datetime
 import json
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
-from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from os.path import abspath, basename, dirname, join
 from pathlib import Path
-from threading import Event, Thread
+from threading import Event
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
@@ -40,6 +38,12 @@ from conda.models.channel import Channel
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PrefixRecord
 from conda.testing.helpers import CHANNEL_DIR_V1, package_cache_record
+from conda.testing.http_test_server import (
+    AUTH_PASSWORD,
+    AUTH_TOKEN,
+    AUTH_USER,
+    run_test_server,
+)
 from conda.utils import url_path
 
 if TYPE_CHECKING:
@@ -1093,44 +1097,14 @@ def test_cover_extract_bad_package(tmp_path):
     PackageCacheData.first_writable()._make_single_record(str(fullpath))
 
 
-AUTH_USER = "conda-user"
-AUTH_PASSWORD = "conda-password"
-AUTH_TOKEN = "xx-00000000-0000-0000-0000-000000000000"
-
-
 @pytest.fixture
 def auth_channel_server() -> Iterator[str]:
     """Serve CHANNEL_DIR_V1 and reject requests without basic auth or a /t/<token>/ prefix."""
-    basic = base64.b64encode(f"{AUTH_USER}:{AUTH_PASSWORD}".encode()).decode()
-    token_prefix = f"/t/{AUTH_TOKEN}"
-
-    class AuthHandler(SimpleHTTPRequestHandler):
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, directory=CHANNEL_DIR_V1, **kwargs)
-
-        def _authorized(self) -> bool:
-            if self.path.startswith(f"{token_prefix}/"):
-                self.path = self.path[len(token_prefix) :]
-                return True
-            return self.headers.get("Authorization") == f"Basic {basic}"
-
-        def do_HEAD(self):
-            if self._authorized():
-                return super().do_HEAD()
-            self.send_error(401)
-
-        def do_GET(self):
-            if self._authorized():
-                return super().do_GET()
-            self.send_error(401)
-
-    server = ThreadingHTTPServer(("127.0.0.1", 0), AuthHandler)
-    Thread(target=server.serve_forever, daemon=True).start()
+    server = run_test_server(CHANNEL_DIR_V1, enable_auth=True)
     try:
         yield f"127.0.0.1:{server.server_address[1]}"
     finally:
         server.shutdown()
-        server.server_close()
 
 
 @pytest.mark.integration
