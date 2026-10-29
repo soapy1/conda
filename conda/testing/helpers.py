@@ -28,7 +28,7 @@ from ..gateways.disk.delete import rm_rf
 from ..gateways.disk.read import lexists
 from ..history import History
 from ..models.channel import Channel
-from ..models.records import PackageRecord, PrefixRecord, PackageCacheRecord
+from ..models.records import PackageCacheRecord, PackageRecord, PrefixRecord
 from ..resolve import Resolve
 
 # The default value will only work if we have installed conda in development mode!
@@ -482,6 +482,7 @@ def record(
         channel=channel,
         **kwargs,
     )
+
 
 def package_cache_record(
     name="a",

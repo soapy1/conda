@@ -43,7 +43,7 @@ from ..common.path import expand, strip_pkg_extension, url_to_path
 from ..common.serialize import json
 from ..common.signals import signal_handler
 from ..common.terminal import is_tty, term_dumb
-from ..common.url import path_to_url, mask_anaconda_token
+from ..common.url import mask_anaconda_token, path_to_url
 from ..common.url import remove_auth as url_remove_auth
 from ..exceptions import NotWritableError, NoWritablePkgsDirError, PluginError
 from ..gateways.disk.create import (

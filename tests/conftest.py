@@ -32,12 +32,14 @@ from conda.plugins.manager import CondaPluginManager
 from conda.plugins.reporter_backends import plugins as reporter_backend_plugins
 from conda.plugins.types import CondaEnvironmentExporter
 from conda.testing import http_test_server
+from conda.testing.helpers import CHANNEL_DIR_V1
+from conda.testing.http_test_server import run_test_server
 
 from . import PYTHON_SPEC, TEST_RECIPES_CHANNEL
 
 if TYPE_CHECKING:
     import http.server
-    from collections.abc import Iterable
+    from collections.abc import Iterable, Iterator
 
     from pytest_mock import MockerFixture
 
@@ -368,3 +370,13 @@ def env_with_small_pip_package(
         PrefixData._cache_.clear()
 
         return prefix
+
+
+@pytest.fixture
+def auth_channel_server() -> Iterator[str]:
+    """Serve CHANNEL_DIR_V1 and reject requests without basic auth or a /t/<token>/ prefix."""
+    server = run_test_server(CHANNEL_DIR_V1, enable_auth=True)
+    try:
+        yield f"127.0.0.1:{server.server_address[1]}"
+    finally:
+        server.shutdown()

@@ -7,13 +7,11 @@ import json
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures.process import BrokenProcessPool
 from os.path import abspath, basename, dirname, join
-from pathlib import Path
 from threading import Event
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import pytest
-from pytest import MonkeyPatch
 
 from conda import CondaError, CondaMultiError
 from conda.base.constants import PACKAGE_CACHE_MAGIC_FILE
@@ -33,8 +31,8 @@ from conda.core.subdir_data import SubdirData
 from conda.gateways.disk.create import copy
 from conda.gateways.disk.permissions import make_read_only
 from conda.gateways.disk.read import isfile, listdir, yield_lines
-from conda.models.enums import LinkType
 from conda.models.channel import Channel
+from conda.models.enums import LinkType
 from conda.models.match_spec import MatchSpec
 from conda.models.records import PrefixRecord
 from conda.testing.helpers import CHANNEL_DIR_V1, package_cache_record
@@ -42,12 +40,14 @@ from conda.testing.http_test_server import (
     AUTH_PASSWORD,
     AUTH_TOKEN,
     AUTH_USER,
-    run_test_server,
 )
 from conda.utils import url_path
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from pathlib import Path
+
+    from pytest import MonkeyPatch
+
 
 assert CHANNEL_DIR_V1 == abspath(
     join(dirname(__file__), "..", "data", "conda_format_repo")
@@ -1097,16 +1097,6 @@ def test_cover_extract_bad_package(tmp_path):
     PackageCacheData.first_writable()._make_single_record(str(fullpath))
 
 
-@pytest.fixture
-def auth_channel_server() -> Iterator[str]:
-    """Serve CHANNEL_DIR_V1 and reject requests without basic auth or a /t/<token>/ prefix."""
-    server = run_test_server(CHANNEL_DIR_V1, enable_auth=True)
-    try:
-        yield f"127.0.0.1:{server.server_address[1]}"
-    finally:
-        server.shutdown()
-
-
 @pytest.mark.integration
 @pytest.mark.parametrize(
     "credentials,secrets",
@@ -1145,10 +1135,10 @@ def test_no_tokens_dumped(tmp_path: Path, remove_auth: bool):
     pkg_record = package_cache_record(
         channel="fake",
         url="https://conda.anaconda.org/t/some-fake-token/fake/noarch/a-1.0-0.tar.bz2",
-        tmp_dir=tmp_path
+        tmp_dir=tmp_path,
     )
     pcd = PackageCacheData(tmp_path)
-    extracted_package_info =  (tmp_path / "a-1.0-0" / "info" )
+    extracted_package_info = tmp_path / "a-1.0-0" / "info"
     extracted_package_info.mkdir(parents=True, exist_ok=True)
 
     pcd.insert(pkg_record, remove_auth=remove_auth)
@@ -1159,15 +1149,16 @@ def test_no_tokens_dumped(tmp_path: Path, remove_auth: bool):
     else:
         assert "/t/some-fake-token/" in json_content
 
+
 @pytest.mark.parametrize("remove_auth", (True, False))
 def test_no_auth_dumped(tmp_path: Path, remove_auth: bool):
     pkg_record = package_cache_record(
         channel="fake",
         url="https://user:password@conda.anaconda.org/fake/noarch/a-1.0-0.tar.bz2",
-        tmp_dir=tmp_path
+        tmp_dir=tmp_path,
     )
     pcd = PackageCacheData(tmp_path)
-    extracted_package_info =  (tmp_path / "a-1.0-0" / "info" )
+    extracted_package_info = tmp_path / "a-1.0-0" / "info"
     extracted_package_info.mkdir(parents=True, exist_ok=True)
 
     pcd.insert(pkg_record, remove_auth=remove_auth)

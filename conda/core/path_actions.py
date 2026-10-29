@@ -48,7 +48,6 @@ from ..gateways.disk.create import (
     create_python_entry_point,
     make_menu,
     mkdir_p,
-    write_as_json_to_file,
 )
 from ..gateways.disk.delete import rm_rf
 from ..gateways.disk.permissions import make_writable
