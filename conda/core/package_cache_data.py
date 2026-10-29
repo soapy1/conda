@@ -562,12 +562,11 @@ class PackageCacheData(metaclass=PackageCacheType):
 
             # write the info/repodata_record.json file so we can short-circuit this next time
             if self.is_writable:
-                repodata_record = PackageRecord.from_objects(package_cache_record)
                 repodata_record_path = join(
                     extracted_package_dir, "info", "repodata_record.json"
                 )
                 try:
-                    write_as_json_to_file(repodata_record_path, repodata_record)
+                    self.insert(package_cache_record)
                 except OSError as e:
                     if e.errno in (EACCES, EPERM, EROFS) and isdir(
                         dirname(repodata_record_path)
